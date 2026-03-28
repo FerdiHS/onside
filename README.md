@@ -158,7 +158,7 @@ It is used to perform live web extraction and turn football web pages into struc
 
 ### Current Match Prep implementation
 The current Match Prep foundation supports:
-- `GET /api/fixtures` for the mock upcoming match selector
+- `GET /api/fixtures` for the mock upcoming future-match selector
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
@@ -168,6 +168,7 @@ The current live Match Prep source strategy uses a curated football source pack:
 - OneFootball, GOAL, B/R Football, and 433 as supporting sources
 
 Completed Match Prep results are cached in memory per dev-server instance for faster follow-up reads.
+Cached responses that originated from the direct sync route may not include a `run_id`, because no async TinyFish run handle exists for them.
 
 The `detail` level is important for UX:
 - `detail=summary` asks TinyFish for a lighter, faster summary-focused payload

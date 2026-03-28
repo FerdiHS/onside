@@ -201,7 +201,7 @@ export async function getLiveMatchPrepRunStatus(
   }
 
   const interpreted = interpretTinyFishMatchPrepPayload(
-    run.result,
+    unwrapTinyFishResult(run),
     getScenarioSeed(scenario),
     detail,
     runDetails,

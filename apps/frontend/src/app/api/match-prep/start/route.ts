@@ -49,11 +49,11 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         match_id: matchId,
-        run_id: cached.runId,
         status: "completed",
         cached: true,
         poll_url: buildStatusUrl(matchId, detail),
         result_url: buildResultUrl(matchId, detail),
+        ...(cached.runId ? { run_id: cached.runId } : {}),
       },
       meta: createMeta("live", cached.completeness, {
         progress_supported: true,

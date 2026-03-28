@@ -415,6 +415,7 @@ Returns `FailureResponse`.
 
 ### Current implementation notes
 - The current implementation is mock-backed from the seeded Match Prep scenario list.
+- Only fixtures with kickoff times at or after the current server time are returned.
 - Optional `clubId` filters by either home or away club slug.
 - Optional `competition` filters by exact competition label.
 
@@ -490,6 +491,7 @@ Start a long-running live Match Prep TinyFish run and return a pollable handle q
 
 ### Notes
 - If a completed cached result already exists, the route may return `status: "completed"` with `cached: true`.
+- Cached responses that were produced by the direct sync Match Prep route may omit `run_id`, because no async TinyFish run handle exists for them.
 - If an active run already exists for the same `matchId`, the route may return that existing `run_id` instead of starting a duplicate run.
 - `detail` is optional and defaults to `full` in the current route implementation.
 - Failures return `FailureResponse`.
@@ -556,6 +558,7 @@ Optional:
 
 ### Notes
 - In the current implementation, active run tracking and completed-result caching are in-memory only.
+- Cached responses that were produced by the direct sync Match Prep route may omit `run_id`, because no async TinyFish run handle exists for them.
 - If the dev server restarts, a previously returned `runId` may no longer be known to the app instance unless `matchId` is also provided.
 - Failures inside a completed or cancelled TinyFish run are returned inside the success payload's `data.error` field so the UI can keep polling and rendering one stable shape.
 - Route-level validation or config failures still return `FailureResponse`.
