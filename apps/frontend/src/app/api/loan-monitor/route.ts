@@ -8,8 +8,11 @@ export async function GET() {
           name: "Jimmy-Jay Morgan",
           loanClub: "Gillingham",
           position: "Forward",
-          performance:
-            "Playing regular minutes and showing sharper movement in the penalty area.",
+          performance: {
+            appearances: 12,
+            goals: 4,
+            assists: 2,
+          },
           developmentNotes: [
             "More confident receiving under pressure",
             "Work rate without the ball has improved",
@@ -21,8 +24,11 @@ export async function GET() {
           name: "Cesare Casadei",
           loanClub: "Leicester City",
           position: "Midfielder",
-          performance:
-            "Steady involvement across midfield with useful physical presence and late box runs.",
+          performance: {
+            appearances: 18,
+            goals: 3,
+            assists: 1,
+          },
           developmentNotes: [
             "Maintaining solid availability",
             "Still adapting to mixed midfield responsibilities",
@@ -32,7 +38,7 @@ export async function GET() {
       ],
     },
     meta: {
-      mode: "mock",
+      source: "mock",
       completeness: "full",
       generatedAt: new Date().toISOString(),
     },
