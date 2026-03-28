@@ -5,6 +5,7 @@
 Onside is a **club-facing football intelligence web app** built for the TinyFish Hackathon.
 
 The MVP helps users:
+
 - prepare for matches
 - monitor players
 - view a club-facing loan monitor workflow
@@ -16,12 +17,14 @@ The core product idea is to transform scattered football web information into st
 ## Product Goals
 
 ### Primary goals
+
 - Build a **clean, demo-ready football intelligence product**
 - Use **live web extraction** where it matters
 - Keep the architecture **simple enough for a solo hackathon**
 - Preserve a **reliable fallback path** when live extraction is unstable
 
 ### Secondary goals
+
 - Make the product feel club-facing and serious
 - Keep the design aligned with a football ops / scouting dashboard theme
 - Leave room for future expansion without overbuilding now
@@ -31,6 +34,7 @@ The core product idea is to transform scattered football web information into st
 ## Non-Goals
 
 For the hackathon MVP, we explicitly avoid:
+
 - separate backend services
 - a database
 - user authentication
@@ -42,6 +46,7 @@ For the hackathon MVP, we explicitly avoid:
 - advanced sponsor analytics
 
 The architecture should optimize for:
+
 - feasibility
 - clarity
 - speed of implementation
@@ -54,6 +59,7 @@ The architecture should optimize for:
 The app uses a **single Next.js codebase**.
 
 It contains:
+
 - frontend pages and components
 - route handlers for server-side data access
 - mock datasets
@@ -87,12 +93,14 @@ Next.js Route Handlers (server-side)
 ## Why This Architecture
 
 This architecture is intentionally simple because:
+
 - the project is being built **solo**
 - the hackathon rewards a working product more than infra complexity
 - the frontend already needs some server-side logic to safely call TinyFish
 - route handlers are enough for the MVP
 
 This avoids:
+
 - deploying and debugging multiple services
 - database setup overhead
 - authentication overhead
@@ -105,6 +113,7 @@ This avoids:
 ## 1. Frontend
 
 ### Responsibility
+
 - render pages and components
 - handle navigation and selection flows
 - display structured data
@@ -112,18 +121,22 @@ This avoids:
 - show lightweight progress text during live loading when progress events are available
 
 ### Main pages
+
 - `/` — homepage
 - `/match/[id]` — Match Prep
 - `/players` — Player Watch
 - `/club/[clubId]` or `/club` — Club Package / Loan Monitor
 
 ### UI design goals
+
 The frontend should feel like:
+
 - a football ops room
 - a scouting dashboard
 - a structured intelligence product
 
 It should not feel like:
+
 - a betting app
 - a social feed
 - a fan blog
@@ -133,6 +146,7 @@ It should not feel like:
 ## 2. Route Handlers
 
 ### Responsibility
+
 - receive requests from the UI
 - decide whether to use mock mode or live mode
 - fetch and normalize data
@@ -141,7 +155,9 @@ It should not feel like:
 - keep secrets server-side
 
 ### Why route handlers
+
 They are sufficient for the MVP because they:
+
 - remove the need for a separate backend
 - protect secrets like `TINYFISH_API_KEY`
 - provide a stable internal API layer
@@ -152,16 +168,19 @@ They are sufficient for the MVP because they:
 ## 3. Mock Data Layer
 
 ### Responsibility
+
 - provide stable development data
 - unblock UI work before live extraction is ready
 - act as a fallback demo path
 - keep mock mode and live mode aligned
 
 ### Why it matters
+
 Mock data is not just for convenience.
 It is part of the reliability strategy.
 
 If live extraction is unstable, the app should still:
+
 - render
 - demonstrate flows
 - show meaningful examples
@@ -171,11 +190,13 @@ If live extraction is unstable, the app should still:
 ## 4. TinyFish Integration Layer
 
 ### Responsibility
+
 - perform live web extraction
 - transform relevant football pages into structured outputs
 - power live Match Prep and live Player Watch where possible
 
 ### Design rules
+
 - server-side only
 - centralized integration code
 - centralized prompt templates
@@ -184,27 +205,30 @@ If live extraction is unstable, the app should still:
 - prefer async start plus polling for long-running live extraction
 
 ### Recommended file ownership
+
 - `lib/tinyfish.ts`
 - `lib/prompts.ts`
 
 ### Why centralization matters
+
 Without centralization:
+
 - prompts drift
 - error handling becomes inconsistent
 - feature pages become harder to maintain
 
 ---
 
-
-
 ## 5. OpenAI Synthesis Layer
 
 ### Responsibility
+
 - turn structured football signals into concise readable summaries
 - generate compact talking points and short player summaries
 - keep the UI concise without replacing structured source-backed fields
 
 ### Design rules
+
 - server-side only
 - centralized integration code
 - structured inputs first
@@ -212,21 +236,25 @@ Without centralization:
 - graceful fallback when synthesis fails
 
 ### Recommended file ownership
+
 - `lib/openai.ts`
 - shared synthesis prompts in `lib/prompts.ts` or a nearby shared module
 
 ### Why this layer exists
+
 TinyFish and mock/live data provide the structured football signals.
 OpenAI is used to synthesize those signals into concise club-facing text without forcing UI components to handle raw model output directly.
 
 ## 6. Shared Schema Layer
 
 ### Responsibility
+
 - define stable response shapes
 - validate live outputs
 - normalize mock and live mode to one interface
 
 ### Expected schemas
+
 - Match Prep
 - Player Watch
 - Loan Monitor
@@ -234,6 +262,7 @@ OpenAI is used to synthesize those signals into concise club-facing text without
 - listing/selection responses
 
 ### Why it matters
+
 The UI should trust normalized server responses, not raw agent output.
 
 ---
@@ -243,6 +272,7 @@ The UI should trust normalized server responses, not raw agent output.
 ## Match Prep
 
 ### User flow
+
 1. User selects a match
 2. Frontend requests structured match-prep data
 3. In mock mode, the route returns the stable mock contract immediately
@@ -252,6 +282,7 @@ The UI should trust normalized server responses, not raw agent output.
 7. Frontend renders briefing sections
 
 ### Main sections
+
 - match overview
 - probable lineups
 - injuries / absences
@@ -260,7 +291,9 @@ The UI should trust normalized server responses, not raw agent output.
 - sources
 
 ### Live mode focus
+
 Match Prep is the best first candidate for live TinyFish extraction because it is:
+
 - demoable
 - clearly structured
 - easy for judges to understand
@@ -268,6 +301,7 @@ Match Prep is the best first candidate for live TinyFish extraction because it i
 OpenAI synthesis can then turn the structured result into concise talking points or a short briefing summary without changing the source-backed core fields.
 
 ### Current live implementation notes
+
 - live Match Prep uses a curated football source pack instead of a generic web search start page
 - the primary source is Sofascore, with OneFootball, GOAL, B/R Football, and 433 as supporting sources
 - the app supports both direct sync reads and async TinyFish start plus polling endpoints
@@ -280,6 +314,7 @@ OpenAI synthesis can then turn the structured result into concise talking points
 ## Player Watch
 
 ### User flow
+
 1. User selects a club
 2. User selects a tracked player
 3. Frontend requests structured player-watch data
@@ -287,6 +322,7 @@ OpenAI synthesis can then turn the structured result into concise talking points
 5. Response is validated and rendered
 
 ### Main sections
+
 - player summary
 - status badge
 - recent updates
@@ -295,6 +331,7 @@ OpenAI synthesis can then turn the structured result into concise talking points
 - sources
 
 ### Notes
+
 For the MVP, Player Watch can be partially mock-backed if needed, as long as the UX and data contracts are stable.
 
 Where useful, OpenAI can synthesize a short player summary from the structured inputs, but the structured fields remain the source of truth.
@@ -304,20 +341,25 @@ Where useful, OpenAI can synthesize a short player summary from the structured i
 ## Club Package / Loan Monitor
 
 ### User flow
+
 1. User selects a club
 2. Frontend requests loan-monitor data
 3. Backend returns tracked player summaries for that club
 4. Frontend renders the premium club-facing dashboard
 
 ### Why this feature matters
+
 This is the strongest club-facing story in the MVP.
 
 It helps the product feel like:
+
 - football intelligence for clubs
 - not just a generic football summary app
 
 ### Demo scope
+
 Supported demo clubs:
+
 - Chelsea
 - Manchester United
 
@@ -330,11 +372,13 @@ The architecture must remain generic even though the demo data is club-specific.
 ## Mock Mode
 
 ### Purpose
+
 - speed up UI development
 - support fallback demos
 - reduce dependence on live extraction during early development
 
 ### Requirements
+
 - always available
 - same output shape as live mode
 - stable enough for screenshots and recorded demo segments
@@ -344,11 +388,13 @@ The architecture must remain generic even though the demo data is club-specific.
 ## Live Mode
 
 ### Purpose
+
 - showcase TinyFish in the final product
 - demonstrate real live web extraction
 - improve judge-facing credibility
 
 ### Requirements
+
 - server-side only
 - same output shape as mock mode
 - safe fallback when partial or failed
@@ -388,6 +434,7 @@ Page
 ## Error Handling Strategy
 
 The architecture should assume:
+
 - missing data
 - partial data
 - upstream failures
@@ -395,6 +442,7 @@ The architecture should assume:
 - unsupported demo inputs
 
 ### Principles
+
 - fail gracefully
 - preserve page usability
 - show structured error states
@@ -402,7 +450,9 @@ The architecture should assume:
 - never crash because one source is missing
 
 ### Required page states
+
 Every major page should have:
+
 - loading state
 - empty state
 - error state
@@ -417,17 +467,21 @@ When live TinyFish progress is available, loading states may also show short pro
 The app must treat clubs as **data**, not as hardcoded product logic.
 
 ### Good examples
+
 - `clubId`
 - shared club config
 - shared routes
 - shared page components
 
 ### Bad examples
+
 - club-specific core functions
 - club-specific architectural branches
 
 ### Why this matters
+
 The demo uses:
+
 - Chelsea
 - Manchester United
 
@@ -480,18 +534,22 @@ The exact structure can vary slightly, but responsibilities should stay separate
 ## Deployment Model
 
 ### Primary development model
+
 - local-first
 - mock mode always available
 - live mode enabled when ready
 
 ### Optional deployment model
+
 - Vercel
 - route handlers remain server-side
 - environment variables stay in server runtime
 - deployment is optional for the hackathon MVP
 
 ### Why not GitHub Pages
+
 GitHub Pages is static hosting and does not fit this architecture well because:
+
 - the app uses server-side route handlers
 - TinyFish secrets must stay server-side
 - the app is not purely static
@@ -501,9 +559,11 @@ GitHub Pages is static hosting and does not fit this architecture well because:
 ## Security and Secret Handling
 
 ### Core rule
+
 Never expose `TINYFISH_API_KEY` to the client.
 
 ### Practical rules
+
 - TinyFish calls happen only in server route handlers or server-side helpers
 - no live extraction from browser code
 - no `NEXT_PUBLIC_` secrets for TinyFish
@@ -528,7 +588,9 @@ Recommended order:
 11. optional deployment
 
 ### Why this order
+
 It gives the project:
+
 - a visible product early
 - a fallback path early
 - a stable contract layer before live integration
@@ -539,6 +601,7 @@ It gives the project:
 ## Trade-Offs
 
 ### Chosen trade-offs
+
 - simple architecture over purity
 - mock/live dual-mode over live-only fragility
 - one codebase over multiple services
@@ -546,6 +609,7 @@ It gives the project:
 - demo reliability over ambitious breadth
 
 ### Accepted limitations
+
 - no persistence initially
 - no user-specific saved watchlists
 - no real-time push updates
@@ -559,6 +623,7 @@ These are acceptable for the hackathon MVP.
 ## Future Evolution
 
 After the hackathon, the architecture could expand into:
+
 - saved watchlists
 - historical trend snapshots
 - database-backed club/player tracking
@@ -575,11 +640,13 @@ These are future extensions, not current requirements.
 ## Final Note
 
 This architecture should feel like:
+
 - a focused product architecture for a hackathon MVP
 - not a fake enterprise blueprint
 - not a throwaway prototype with no structure
 
 The right balance is:
+
 - small
 - clear
 - demoable

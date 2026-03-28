@@ -160,7 +160,7 @@ It is used to perform live web extraction and turn football web pages into struc
 
 The current Match Prep foundation supports:
 
-- `GET /api/fixtures` for the mock upcoming future-match selector
+- `GET /api/fixtures` for the mock upcoming match selector
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
