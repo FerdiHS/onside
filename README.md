@@ -293,10 +293,10 @@ Recommended prefixes:
 - `docs:` for documentation-only changes
 - `chore:` for maintenance and tooling updates
 
-Release automation uses a GitHub App token. Configure these repository secrets:
+Release automation uses a GitHub App token. Configure these repository settings:
 
-- `RELEASE_PLEASE_APP_ID`
-- `RELEASE_PLEASE_APP_PRIVATE_KEY`
+- repository variable: `RELEASE_PLEASE_APP_ID`
+- repository secret: `RELEASE_PLEASE_APP_PRIVATE_KEY`
 
 ---
 
