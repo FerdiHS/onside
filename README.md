@@ -19,14 +19,17 @@ The product is positioned primarily as a **club-facing football intelligence cop
 ## MVP Scope
 
 ### Core features
+
 - **Match Prep**
 - **Player Watch**
 - **Club Package** with **Loan Monitor**
 
 ### Match Prep
+
 Generate a structured pre-match briefing for a selected match.
 
 Expected output:
+
 - competition
 - kickoff time
 - home team and away team
@@ -37,9 +40,11 @@ Expected output:
 - source links
 
 ### Player Watch
+
 Generate a structured player intelligence summary for a selected club and player.
 
 Expected output:
+
 - player name
 - club
 - status
@@ -50,9 +55,11 @@ Expected output:
 - source links
 
 ### Club Package / Loan Monitor
+
 Show the premium club-facing workflow by monitoring loaned-out players.
 
 Expected output:
+
 - tracked players for a selected club
 - simple status cards
 - short development summaries
@@ -76,12 +83,14 @@ These clubs are demo data and example inputs only. The product should not be har
 This is **not** a generic fan app and **not** a betting-style product.
 
 Primary positioning:
+
 - football intelligence tool
 - club-facing workflow
 - match preparation and player monitoring
 - source-backed structured outputs
 
 Secondary positioning:
+
 - creators
 - analysts
 - serious fans
@@ -93,11 +102,13 @@ Secondary positioning:
 Onside is designed as a dark, premium football intelligence dashboard.
 
 The UI should feel like:
+
 - a football ops room
 - a scouting or monitoring tool
 - a structured match briefing interface
 
 It should **not** feel like:
+
 - a football blog
 - a betting app
 - a social feed
@@ -108,6 +119,7 @@ It should **not** feel like:
 ## Tech Stack
 
 Current planned stack:
+
 - **Next.js**
 - **TypeScript**
 - **Tailwind CSS**
@@ -118,6 +130,7 @@ Current planned stack:
 - **Vercel** optional for deployment
 
 Initial MVP assumptions:
+
 - no separate backend
 - no database at first
 - local-first development
@@ -130,11 +143,13 @@ Initial MVP assumptions:
 TinyFish is a core part of the product.
 
 It is used to perform live web extraction and turn football web pages into structured outputs for:
+
 - Match Prep
 - Player Watch
 - Loan Monitor
 
 ### Integration principles
+
 - TinyFish must be called **server-side only**
 - `TINYFISH_API_KEY` must never be exposed to the client
 - prompts should request structured JSON
@@ -150,12 +165,14 @@ It is used to perform live web extraction and turn football web pages into struc
 OpenAI is used as a **server-side synthesis layer**.
 
 It is intended for tasks such as:
+
 - turning structured match data into concise briefing summaries
 - generating short talking points from structured football signals
 - producing short Player Watch summaries
 - polishing Loan Monitor summaries into clear club-facing text
 
 ### Integration principles
+
 - OpenAI must be called **server-side only**
 - `OPENAI_API_KEY` must never be exposed to the client
 - OpenAI should synthesize from structured inputs, not replace source-backed fields
@@ -167,19 +184,24 @@ It is intended for tasks such as:
 The app should support both:
 
 ### Mock mode
+
 Used for:
+
 - development
 - UI work
 - fallback demos
 - stable screenshots and recorded flows
 
 ### Live mode
+
 Used for:
+
 - TinyFish extraction
 - final validation
 - judge-facing demos when reliable
 
 Recommended strategy:
+
 - keep mock mode always available
 - enable live mode explicitly
 - never let a live extraction failure break the whole app
@@ -208,6 +230,7 @@ Planned structure:
 ```
 
 ### Expected responsibilities
+
 - `app/`: pages and route handlers
 - `components/`: reusable UI components
 - `lib/`: schemas, mock data, prompts, integrations, formatting
@@ -229,6 +252,7 @@ NEXT_PUBLIC_APP_NAME=Onside
 ```
 
 Notes:
+
 - `TINYFISH_API_KEY` is required for live TinyFish mode
 - `OPENAI_API_KEY` is required for server-side synthesis features
 - keep secrets server-side only
@@ -258,6 +282,22 @@ npm run typecheck
 npm run build
 ```
 
+## Commit Convention (Release Please)
+
+This repository uses Conventional Commits so Release Please can generate changelogs and release PRs consistently.
+
+Recommended prefixes:
+
+- `feat:` for user-facing features (minor release)
+- `fix:` for bug fixes (patch release)
+- `docs:` for documentation-only changes
+- `chore:` for maintenance and tooling updates
+
+Release automation uses a GitHub App token. Configure these repository settings:
+
+- repository variable: `RELEASE_PLEASE_APP_ID`
+- repository secret: `RELEASE_PLEASE_APP_PRIVATE_KEY`
+
 ---
 
 ## Current Implementation Plan
@@ -280,6 +320,7 @@ High-level build order:
 ## What “Done” Means
 
 A feature is only considered done if:
+
 - it renders correctly
 - it works in mock mode
 - it handles loading and error states where relevant
@@ -324,6 +365,7 @@ Recommended hackathon demo flow:
 This repository is currently a hackathon MVP in active development.
 
 The first priority is a clean, reliable, demo-ready implementation of:
+
 - Match Prep
 - Player Watch
 - Loan Monitor

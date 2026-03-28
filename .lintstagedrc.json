@@ -1,0 +1,9 @@
+{
+  "apps/frontend/*.{js,jsx,ts,tsx,mjs,cjs}": [
+    "./apps/frontend/node_modules/.bin/eslint --max-warnings=0 --fix",
+    "./apps/frontend/node_modules/.bin/prettier --write"
+  ],
+  "*.{json,md,css,scss,yml,yaml}": [
+    "./apps/frontend/node_modules/.bin/prettier --write"
+  ]
+}
