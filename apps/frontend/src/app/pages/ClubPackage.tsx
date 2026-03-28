@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { TrendingUp, Minus, AlertTriangle } from 'lucide-react';
 import { ClubBadge } from '../components/ClubBadge';
 
@@ -28,6 +28,78 @@ type ClubInfo = {
   players: ClubPlayer[];
   sources: ClubSource[];
 };
+
+type LoanMonitorApiPlayer = {
+  id: string;
+  name: string;
+  loanClub: string;
+  position: string;
+  performance: {
+    appearances: number;
+    goals: number;
+    assists: number;
+  };
+  developmentNotes: string[];
+  status: PlayerStatus;
+};
+
+type LoanMonitorSuccessResponse = {
+  success: true;
+  data: {
+    players: LoanMonitorApiPlayer[];
+  };
+  meta?: {
+    source?: string;
+  };
+};
+
+type LoanMonitorPendingResponse = {
+  success: false;
+  status: 'pending';
+  runId: string;
+};
+
+type LoanMonitorFailedResponse = {
+  success: false;
+  status: 'failed';
+  error: {
+    message: string;
+  };
+};
+
+type LoanMonitorResponse =
+  | LoanMonitorSuccessResponse
+  | LoanMonitorPendingResponse
+  | LoanMonitorFailedResponse;
+
+const LOAN_MONITOR_RUN_ID_STORAGE_KEY = 'onside.loan-monitor.run-id';
+const LOAN_MONITOR_RESULT_STORAGE_KEY = 'onside.loan-monitor.result';
+
+function readStoredLoanMonitorPlayers(): ClubPlayer[] | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const storedPlayers = window.sessionStorage.getItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+  if (!storedPlayers) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedPlayers) as ClubPlayer[];
+  } catch {
+    window.sessionStorage.removeItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+    return null;
+  }
+}
+
+function readStoredLoanMonitorRunId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.sessionStorage.getItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY);
+}
 
 const clubs = ['Chelsea', 'Manchester United', 'Arsenal', 'Liverpool'];
 
@@ -105,6 +177,28 @@ function statusStyle(status: string) {
   return { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa', label: 'Stable' };
 }
 
+function mapLoanMonitorPlayers(players: LoanMonitorApiPlayer[]): ClubPlayer[] {
+  return players.map((player) => ({
+    name: player.name,
+    currentClub: player.loanClub,
+    isLoan: true,
+    status: player.status,
+    summary: `${player.position}. ${player.performance.goals} goals, ${player.performance.assists} assists in ${player.performance.appearances} appearances. ${player.developmentNotes[0] ?? ''}`.trim(),
+    lastUpdate: 'Live via TinyFish',
+  }));
+}
+
+function getClubInfoWithPlayers(base: ClubInfo, players: ClubPlayer[]): ClubInfo {
+  return {
+    ...base,
+    trackedPlayers: players.length,
+    rising: players.filter((player) => player.status === 'rising').length,
+    stable: players.filter((player) => player.status === 'stable').length,
+    concern: players.filter((player) => player.status === 'concern').length,
+    players,
+  };
+}
+
 const card: React.CSSProperties = {
   backgroundColor: '#1a2540',
   border: '1px solid rgba(255,255,255,0.07)',
@@ -143,7 +237,137 @@ function MetricCard({ label, value, color, icon }: { label: string; value: numbe
 
 export function ClubPackage() {
   const [selectedClub, setSelectedClub] = useState('Chelsea');
-  const current = clubData[selectedClub] ?? clubData['Chelsea'];
+  const [loanMonitorPlayers, setLoanMonitorPlayers] = useState<ClubPlayer[] | null>(() => readStoredLoanMonitorPlayers());
+  const [loanMonitorRunId, setLoanMonitorRunId] = useState<string | null>(() => readStoredLoanMonitorRunId());
+  const [loanMonitorStatus, setLoanMonitorStatus] = useState<'idle' | 'loading' | 'polling' | 'success' | 'error'>(() => {
+    if (readStoredLoanMonitorPlayers()) {
+      return 'success';
+    }
+
+    if (readStoredLoanMonitorRunId()) {
+      return 'polling';
+    }
+
+    return 'idle';
+  });
+  const [loanMonitorError, setLoanMonitorError] = useState<string | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLoanMonitorPoll = useEffectEvent(() => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  });
+
+  const clearStoredLoanMonitorRunId = useEffectEvent(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY);
+    }
+  });
+
+  const clearStoredLoanMonitorResult = useEffectEvent(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+    }
+  });
+
+  const resetLoanMonitorState = () => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+    setLoanMonitorRunId(null);
+    setLoanMonitorError(null);
+    setLoanMonitorPlayers(null);
+    setLoanMonitorStatus('idle');
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY);
+      window.sessionStorage.removeItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+    }
+  };
+
+  const pollLoanMonitor = useEffectEvent(async (nextRunId?: string) => {
+    clearLoanMonitorPoll();
+    setLoanMonitorStatus(nextRunId ? 'polling' : 'loading');
+    try {
+      const query = nextRunId ? `?runId=${encodeURIComponent(nextRunId)}` : '';
+      const response = await fetch(`/api/loan-monitor${query}`, { cache: 'no-store' });
+      const payload = (await response.json()) as LoanMonitorResponse;
+
+      if (!payload.success && payload.status === 'pending') {
+        setLoanMonitorRunId(payload.runId);
+        setLoanMonitorError(null);
+        setLoanMonitorStatus('polling');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY, payload.runId);
+        }
+
+        return;
+      }
+
+      if (!payload.success) {
+        setLoanMonitorRunId(null);
+        setLoanMonitorStatus('error');
+        setLoanMonitorError(payload.error.message);
+        clearStoredLoanMonitorRunId();
+        return;
+      }
+
+      setLoanMonitorRunId(null);
+      setLoanMonitorError(null);
+      setLoanMonitorPlayers(mapLoanMonitorPlayers(payload.data.players));
+      setLoanMonitorStatus('success');
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(
+          LOAN_MONITOR_RESULT_STORAGE_KEY,
+          JSON.stringify(mapLoanMonitorPlayers(payload.data.players)),
+        );
+      }
+      clearStoredLoanMonitorRunId();
+    } catch (error) {
+      setLoanMonitorRunId(null);
+      setLoanMonitorStatus('error');
+      setLoanMonitorError(error instanceof Error ? error.message : 'Failed to load loan monitor');
+      clearStoredLoanMonitorRunId();
+    }
+  });
+
+  useEffect(() => {
+    if (selectedClub !== 'Chelsea') {
+      return;
+    }
+
+    if (loanMonitorPlayers) {
+      return;
+    }
+
+    void pollLoanMonitor(loanMonitorRunId ?? undefined);
+
+    return () => {
+      clearLoanMonitorPoll();
+    };
+  }, [loanMonitorPlayers, loanMonitorRunId, selectedClub]);
+
+  useEffect(() => {
+    if (selectedClub !== 'Chelsea' || loanMonitorStatus !== 'polling' || !loanMonitorRunId) {
+      return;
+    }
+
+    pollTimeoutRef.current = setTimeout(() => {
+      void pollLoanMonitor(loanMonitorRunId);
+    }, 1500);
+
+    return () => {
+      clearLoanMonitorPoll();
+    };
+  }, [loanMonitorRunId, loanMonitorStatus, selectedClub]);
+
+  const baseClub = clubData[selectedClub] ?? clubData['Chelsea'];
+  const current =
+    selectedClub === 'Chelsea' && loanMonitorPlayers
+      ? getClubInfoWithPlayers(baseClub, loanMonitorPlayers)
+      : baseClub;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0e1521' }}>
@@ -165,7 +389,17 @@ export function ClubPackage() {
             <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: '#6b7fa3', marginBottom: '8px' }}>
               Select Club
             </label>
-            <select value={selectedClub} onChange={(e) => setSelectedClub(e.target.value)} style={selectStyle}>
+            <select
+              value={selectedClub}
+              onChange={(e) => {
+                const nextClub = e.target.value;
+                if (nextClub !== 'Chelsea') {
+                  resetLoanMonitorState();
+                }
+                setSelectedClub(nextClub);
+              }}
+              style={selectStyle}
+            >
               {clubs.map(club => <option key={club} value={club}>{club}</option>)}
             </select>
           </div>
@@ -209,6 +443,21 @@ export function ClubPackage() {
                 LIVE
               </span>
             </div>
+
+            {selectedClub === 'Chelsea' && loanMonitorStatus !== 'idle' && (
+              <div style={{
+                padding: '14px 24px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                backgroundColor: 'rgba(74,158,255,0.08)',
+                color: '#9bb4d4',
+                fontSize: '12.5px',
+              }}>
+                {loanMonitorStatus === 'loading' && 'Loading loan monitor via TinyFish...'}
+                {loanMonitorStatus === 'polling' && `TinyFish is still running${loanMonitorRunId ? ` (${loanMonitorRunId})` : ''}. Polling again in 1.5s...`}
+                {loanMonitorStatus === 'success' && 'TinyFish completed. Showing live loan-monitor data.'}
+                {loanMonitorStatus === 'error' && `TinyFish failed: ${loanMonitorError ?? 'Unknown error'}`}
+              </div>
+            )}
 
             {current.players.map((player: ClubPlayer, i: number) => {
               const st = statusStyle(player.status);

@@ -157,19 +157,23 @@ It is used to perform live web extraction and turn football web pages into struc
 - partial data should be handled gracefully
 
 ### Current Match Prep implementation
+
 The current Match Prep foundation supports:
+
 - `GET /api/fixtures` for the mock upcoming match selector
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
 
 The current live Match Prep source strategy uses a curated football source pack:
+
 - Sofascore as the primary source
 - OneFootball, GOAL, B/R Football, and 433 as supporting sources
 
 Completed Match Prep results are cached in memory per dev-server instance for faster follow-up reads.
 
 The `detail` level is important for UX:
+
 - `detail=summary` asks TinyFish for a lighter, faster summary-focused payload
 - `detail=full` asks TinyFish for the richer Match Prep payload, including lineups and absences when available
 
@@ -317,6 +321,7 @@ curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-
 ```
 
 Notes:
+
 - use `start` plus `status` with `detail=summary` for the best live UX on slow TinyFish runs
 - use `detail=full` only when you need the richer lineup and absence pass
 - the direct `mode=live` route still works, but it waits for the live extraction unless a cached result already exists
@@ -335,6 +340,7 @@ npm run build
 This repository uses Conventional Commits so Release Please can generate changelogs and release PRs consistently.
 
 Recommended prefixes:
+
 - `feat:` for user-facing features (minor release)
 - `fix:` for bug fixes (patch release)
 - `docs:` for documentation-only changes
