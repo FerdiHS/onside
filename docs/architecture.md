@@ -136,6 +136,7 @@ It should not feel like:
 - receive requests from the UI
 - decide whether to use mock mode or live mode
 - fetch and normalize data
+- start and poll long-running live extraction when needed
 - validate responses before sending to the client
 - keep secrets server-side
 
@@ -180,6 +181,7 @@ If live extraction is unstable, the app should still:
 - centralized prompt templates
 - structured outputs only
 - graceful fallback on failures
+- prefer async start plus polling for long-running live extraction
 
 ### Recommended file ownership
 - `lib/tinyfish.ts`
@@ -243,9 +245,11 @@ The UI should trust normalized server responses, not raw agent output.
 ### User flow
 1. User selects a match
 2. Frontend requests structured match-prep data
-3. Route handler uses mock or live mode
-4. Response is validated and normalized
-5. Frontend renders briefing sections
+3. In mock mode, the route returns the stable mock contract immediately
+4. In live mode, the frontend may request either a summary-first pass or a full Match Prep pass
+5. The frontend may start a TinyFish run, poll status, and then read the normalized result
+6. Response is validated, normalized, and cached in memory for follow-up reads
+7. Frontend renders briefing sections
 
 ### Main sections
 - match overview
@@ -262,6 +266,14 @@ Match Prep is the best first candidate for live TinyFish extraction because it i
 - easy for judges to understand
 
 OpenAI synthesis can then turn the structured result into concise talking points or a short briefing summary without changing the source-backed core fields.
+
+### Current live implementation notes
+- live Match Prep uses a curated football source pack instead of a generic web search start page
+- the primary source is Sofascore, with OneFootball, GOAL, B/R Football, and 433 as supporting sources
+- the app supports both direct sync reads and async TinyFish start plus polling endpoints
+- the app supports `detail=summary` for a faster summary-first live request and `detail=full` for the richer Match Prep pass
+- completed Match Prep results are cached in memory per app instance for faster follow-up reads
+- active runs are tracked in memory only, so restarting the dev server clears run state and cache
 
 ---
 
@@ -362,10 +374,13 @@ Page
 Page
   -> Route Handler
     -> TinyFish integration
-      -> External football web pages
-        -> Structured result
-          -> Validation / normalization
-            -> UI rendering
+      -> Async run start
+        -> External football web pages
+          -> Status polling
+            -> Structured result
+              -> Validation / normalization
+                -> In-memory cache
+                  -> UI rendering
 ```
 
 ---

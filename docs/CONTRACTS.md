@@ -64,7 +64,7 @@ IDs are string-based for the hackathon MVP.
 Examples:
 - `clubId`: `"chelsea"`
 - `playerId`: `"jimmy-jay-morgan"`
-- `matchId`: `"ucl-arsenal-vs-barcelona-2026-04-01"`
+- `matchId`: `"friendly-usa-vs-belgium-2026-03-28"`
 
 No UUID requirement for the MVP.
 
@@ -96,6 +96,7 @@ type ResponseMeta = {
   mode: "mock" | "live";
   completeness: "full" | "partial";
   generated_at: string;
+  detail?: "summary" | "full";
   progress_supported?: boolean;
 };
 ```
@@ -412,6 +413,11 @@ Returns `FixturesResponse`.
 ### Failure
 Returns `FailureResponse`.
 
+### Current implementation notes
+- The current implementation is mock-backed from the seeded Match Prep scenario list.
+- Optional `clubId` filters by either home or away club slug.
+- Optional `competition` filters by exact competition label.
+
 ---
 
 ## `GET /api/match-prep?matchId=<id>`
@@ -428,6 +434,7 @@ Return structured match prep data.
 
 ### Optional query params
 - `mode=mock|live`
+- `detail=summary|full`
 
 ### Success
 Returns `MatchPrepResponse`.
@@ -438,6 +445,120 @@ Returns `FailureResponse`.
 ### Notes
 - `mode` can be omitted if the app decides mode using environment config.
 - If live extraction partially fails, the route may still return `success: true` with `meta.completeness = "partial"`.
+- In the current implementation, this route also returns a cached completed live result when one exists for the requested `matchId`.
+- `detail=summary` keeps the same `MatchPrepResponse` shape but asks TinyFish for a lighter, faster summary-oriented live pass.
+- `detail=full` requests the richer Match Prep extraction and is the default when `detail` is omitted.
+
+---
+
+## `POST /api/match-prep/start`
+
+### Purpose
+Start a long-running live Match Prep TinyFish run and return a pollable handle quickly.
+
+### Request body
+
+```json
+{
+  "matchId": "friendly-usa-vs-belgium-2026-03-28",
+  "detail": "summary"
+}
+```
+
+### Success
+
+```json
+{
+  "success": true,
+  "data": {
+    "match_id": "friendly-usa-vs-belgium-2026-03-28",
+    "run_id": "tf_run_123",
+    "status": "pending",
+    "cached": false,
+    "poll_url": "/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary",
+    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
+  },
+  "meta": {
+    "mode": "live",
+    "completeness": "partial",
+    "generated_at": "2026-03-28T12:34:56Z",
+    "detail": "summary",
+    "progress_supported": true
+  }
+}
+```
+
+### Notes
+- If a completed cached result already exists, the route may return `status: "completed"` with `cached: true`.
+- If an active run already exists for the same `matchId`, the route may return that existing `run_id` instead of starting a duplicate run.
+- `detail` is optional and defaults to `full` in the current route implementation.
+- Failures return `FailureResponse`.
+
+---
+
+## `GET /api/match-prep/status?matchId=<id>`
+
+### Purpose
+Poll the current TinyFish run state for Match Prep and return the normalized result once it is ready.
+
+### Query params
+One of:
+- `matchId`
+- `runId`
+
+Recommended:
+- `matchId`
+
+Optional:
+- `detail=summary|full`
+
+### Success states
+- `status: "pending"`
+- `status: "running"`
+- `status: "completed"`
+- `status: "failed"`
+- `status: "cancelled"`
+
+### Completed example
+
+```json
+{
+  "success": true,
+  "data": {
+    "match_id": "friendly-usa-vs-belgium-2026-03-28",
+    "run_id": "tf_run_123",
+    "status": "completed",
+    "cached": false,
+    "poll_url": "/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary",
+    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary",
+    "result": {
+      "match_id": "friendly-usa-vs-belgium-2026-03-28",
+      "competition": "International Friendly",
+      "kickoff_time": "2026-03-28T19:30:00Z",
+      "home_team": "USA",
+      "away_team": "Belgium",
+      "probable_lineups": { "home": [], "away": [] },
+      "injuries_or_absences": { "home": [], "away": [] },
+      "recent_context": [],
+      "key_talking_points": [],
+      "sources": []
+    }
+  },
+  "meta": {
+    "mode": "live",
+    "completeness": "partial",
+    "generated_at": "2026-03-28T12:34:56Z",
+    "detail": "summary",
+    "progress_supported": true
+  }
+}
+```
+
+### Notes
+- In the current implementation, active run tracking and completed-result caching are in-memory only.
+- If the dev server restarts, a previously returned `runId` may no longer be known to the app instance unless `matchId` is also provided.
+- Failures inside a completed or cancelled TinyFish run are returned inside the success payload's `data.error` field so the UI can keep polling and rendering one stable shape.
+- Route-level validation or config failures still return `FailureResponse`.
 
 ---
 
@@ -511,6 +632,7 @@ Returns `FailureResponse`.
 - Uses TinyFish-backed server-side extraction.
 - Must still return the same response shape.
 - May set `meta.completeness = "partial"` when some fields are unavailable.
+- Long-running live extraction may use a start plus poll flow without changing the final structured Match Prep result contract.
 
 ---
 
