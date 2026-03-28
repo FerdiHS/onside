@@ -1,37 +1,19 @@
 import { z } from "zod";
 
-import type {
-  Completeness,
-  DataMode,
-  FailureResponse,
-  LoanMonitorResponse,
-  MatchPrepResponse,
-  PlayerWatchResponse,
-  ResponseMeta,
-  WatchStatus,
-} from "@/lib/types";
+export const WatchStatusSchema = z.enum(["rising", "stable", "concern"]);
 
-export const WatchStatusSchema: z.ZodType<WatchStatus> = z.enum([
-  "rising",
-  "stable",
-  "concern",
-]);
+export const DataModeSchema = z.enum(["mock", "live"]);
 
-export const DataModeSchema: z.ZodType<DataMode> = z.enum(["mock", "live"]);
+export const CompletenessSchema = z.enum(["full", "partial"]);
 
-export const CompletenessSchema: z.ZodType<Completeness> = z.enum([
-  "full",
-  "partial",
-]);
-
-export const ResponseMetaSchema: z.ZodType<ResponseMeta> = z.object({
+export const ResponseMetaSchema = z.object({
   mode: DataModeSchema,
   completeness: CompletenessSchema,
   generated_at: z.string().min(1),
   progress_supported: z.boolean().optional(),
 });
 
-export const FailureResponseSchema: z.ZodType<FailureResponse> = z.object({
+export const FailureResponseSchema = z.object({
   success: z.literal(false),
   error: z.object({
     code: z.enum([
@@ -58,7 +40,7 @@ export const MatchPrepRouteInputSchema = z.object({
   mode: DataModeSchema.optional(),
 });
 
-export const MatchPrepResponseSchema: z.ZodType<MatchPrepResponse> = z.object({
+export const MatchPrepResponseSchema = z.object({
   success: z.literal(true),
   data: z.object({
     match_id: z.string().min(1),
@@ -87,47 +69,45 @@ export const PlayerWatchRouteInputSchema = z.object({
   mode: DataModeSchema.optional(),
 });
 
-export const PlayerWatchResponseSchema: z.ZodType<PlayerWatchResponse> =
-  z.object({
-    success: z.literal(true),
-    data: z.object({
-      club_id: z.string().min(1),
-      player_id: z.string().min(1),
-      player_name: z.string().min(1),
-      status: WatchStatusSchema,
-      recent_updates: z.array(z.string()),
-      availability_notes: z.array(z.string()),
-      recent_mentions: z.array(z.string()),
-      summary: z.string().min(1),
-      sources: z.array(SourceLinkSchema),
-    }),
-    meta: ResponseMetaSchema,
-  });
+export const PlayerWatchResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    club_id: z.string().min(1),
+    player_id: z.string().min(1),
+    player_name: z.string().min(1),
+    status: WatchStatusSchema,
+    recent_updates: z.array(z.string()),
+    availability_notes: z.array(z.string()),
+    recent_mentions: z.array(z.string()),
+    summary: z.string().min(1),
+    sources: z.array(SourceLinkSchema),
+  }),
+  meta: ResponseMetaSchema,
+});
 
 export const LoanMonitorRouteInputSchema = z.object({
   clubId: z.string().min(1),
   mode: DataModeSchema.optional(),
 });
 
-export const LoanMonitorResponseSchema: z.ZodType<LoanMonitorResponse> =
-  z.object({
-    success: z.literal(true),
-    data: z.object({
-      club_id: z.string().min(1),
-      club_name: z.string().min(1),
-      players: z.array(
-        z.object({
-          id: z.string().min(1),
-          name: z.string().min(1),
-          parent_club_id: z.string().min(1),
-          current_club_name: z.string().nullable().optional(),
-          role: z.string().nullable().optional(),
-          status: WatchStatusSchema,
-          summary: z.string().min(1),
-          latest_updates: z.array(z.string()),
-          sources: z.array(SourceLinkSchema),
-        }),
-      ),
-    }),
-    meta: ResponseMetaSchema,
-  });
+export const LoanMonitorResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    club_id: z.string().min(1),
+    club_name: z.string().min(1),
+    players: z.array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        parent_club_id: z.string().min(1),
+        current_club_name: z.string().nullable().optional(),
+        role: z.string().nullable().optional(),
+        status: WatchStatusSchema,
+        summary: z.string().min(1),
+        latest_updates: z.array(z.string()),
+        sources: z.array(SourceLinkSchema),
+      }),
+    ),
+  }),
+  meta: ResponseMetaSchema,
+});
