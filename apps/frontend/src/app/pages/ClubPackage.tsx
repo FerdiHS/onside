@@ -236,6 +236,16 @@ export function ClubPackage() {
     }
   });
 
+  const resetLoanMonitorState = useEffectEvent(() => {
+    clearLoanMonitorPoll();
+    setLoanMonitorRunId(null);
+    setLoanMonitorError(null);
+    setLoanMonitorPlayers(null);
+    setLoanMonitorStatus('idle');
+    clearStoredLoanMonitorRunId();
+    clearStoredLoanMonitorResult();
+  });
+
   const pollLoanMonitor = useEffectEvent(async (nextRunId?: string) => {
     clearLoanMonitorPoll();
     setLoanMonitorStatus(nextRunId ? 'polling' : 'loading');
@@ -284,13 +294,6 @@ export function ClubPackage() {
 
   useEffect(() => {
     if (selectedClub !== 'Chelsea') {
-      clearLoanMonitorPoll();
-      setLoanMonitorRunId(null);
-      setLoanMonitorError(null);
-      setLoanMonitorPlayers(null);
-      setLoanMonitorStatus('idle');
-      clearStoredLoanMonitorRunId();
-      clearStoredLoanMonitorResult();
       return;
     }
 
@@ -338,7 +341,7 @@ export function ClubPackage() {
     return () => {
       clearLoanMonitorPoll();
     };
-  }, [loanMonitorRunId, loanMonitorStatus, pollLoanMonitor, selectedClub]);
+  }, [loanMonitorRunId, loanMonitorStatus, selectedClub]);
 
   const baseClub = clubData[selectedClub] ?? clubData['Chelsea'];
   const current =
@@ -366,7 +369,17 @@ export function ClubPackage() {
             <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: '#6b7fa3', marginBottom: '8px' }}>
               Select Club
             </label>
-            <select value={selectedClub} onChange={(e) => setSelectedClub(e.target.value)} style={selectStyle}>
+            <select
+              value={selectedClub}
+              onChange={(e) => {
+                const nextClub = e.target.value;
+                if (nextClub !== 'Chelsea') {
+                  resetLoanMonitorState();
+                }
+                setSelectedClub(nextClub);
+              }}
+              style={selectStyle}
+            >
               {clubs.map(club => <option key={club} value={club}>{club}</option>)}
             </select>
           </div>
