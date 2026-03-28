@@ -7,7 +7,6 @@ import {
   getCachedMatchPrepResult,
   getKnownMatchPrepRequestForRunId,
   registerActiveMatchPrepRun,
-  setCachedMatchPrepResult,
   updateActiveMatchPrepRun,
 } from "@/lib/match-prep-jobs";
 import {
@@ -16,6 +15,7 @@ import {
   retryAfterSeconds,
   resolveMatchPrepDetail,
 } from "@/lib/match-prep-runtime";
+import { cacheFinalLiveMatchPrepResult, finalizeLiveMatchPrepData } from "@/lib/match-prep-live";
 import {
   createFailureResponse,
   createMeta,
@@ -24,7 +24,6 @@ import {
   type MatchPrepDetail,
   type MatchPrepRunResponse,
 } from "@/lib/schemas";
-import { ensureLiveSummaryMatchPrepDisplay } from "@/lib/openai";
 import { getLiveMatchPrepRunStatus } from "@/lib/tinyfish";
 
 export const runtime = "nodejs";
@@ -115,13 +114,10 @@ export async function GET(request: NextRequest) {
 
   const cached = getCachedMatchPrepResult(matchId, detail);
   if (cached) {
-    const cachedData =
-      detail === "summary"
-        ? await ensureLiveSummaryMatchPrepDisplay(cached.data)
-        : cached.data;
+    const cachedData = await finalizeLiveMatchPrepData(cached.data, detail);
 
     if (cachedData !== cached.data) {
-      setCachedMatchPrepResult({
+      await cacheFinalLiveMatchPrepResult({
         matchId,
         detail,
         runId: cached.runId,
@@ -208,16 +204,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (polled.kind === "success") {
-      const data =
-        detail === "summary"
-          ? await ensureLiveSummaryMatchPrepDisplay(polled.data)
-          : polled.data;
-
-      setCachedMatchPrepResult({
+      const data = await cacheFinalLiveMatchPrepResult({
         matchId,
         detail,
         runId,
-        data,
+        data: polled.data,
         completeness: polled.completeness,
       });
 

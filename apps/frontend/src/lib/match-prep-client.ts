@@ -91,6 +91,18 @@ export async function pollMatchPrepStatus(input: {
   return fetchApiRunJson(`/api/match-prep/status?${params.toString()}`);
 }
 
+export function buildMatchPrepStreamUrl(input: {
+  matchId: string;
+  detail: MatchPrepDetail;
+}): string {
+  const params = new URLSearchParams({
+    matchId: input.matchId,
+    detail: input.detail,
+  });
+
+  return `/api/match-prep/stream?${params.toString()}`;
+}
+
 export function resolvePollDelayMs(
   response: MatchPrepRunResponse,
   retryAfterMs: number | null,

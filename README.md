@@ -164,6 +164,7 @@ The current Match Prep foundation supports:
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
+- `GET /api/match-prep/stream?matchId=<id>&detail=summary` for TinyFish live research streaming
 - pending polling responses include `next_poll_after_ms` and a `Retry-After` header so the frontend can poll predictably
 
 The current live Match Prep source strategy uses a curated football source pack:
@@ -181,6 +182,7 @@ The `detail` level is important for UX:
 
 Both detail levels keep the same JSON shape. In summary mode, lineup and absence fields may intentionally be empty arrays.
 When `OPENAI_API_KEY` is configured, live `detail=summary` responses may also include an additive `display` layer with AI-assisted projected lineups or summary text for missing fields while preserving the TinyFish root fields as the source-backed core.
+When `NEXT_PUBLIC_MATCH_PREP_MODE=live`, the frontend now prefers the TinyFish live research stream first, showing a curated activity feed plus browser preview when available, and falls back to `start` plus `status` polling if streaming is unavailable or disconnects.
 
 ---
 
@@ -327,6 +329,8 @@ curl -X POST "http://localhost:3000/api/match-prep/start" \
 
 curl "http://localhost:3000/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary"
 
+curl -N "http://localhost:3000/api/match-prep/stream?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary"
+
 curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
 
 curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=full"
@@ -335,6 +339,7 @@ curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-
 Notes:
 
 - use `start` plus `status` with `detail=summary` for the best live UX on slow TinyFish runs
+- the frontend now tries the live research stream first in `mode=live`, then falls back to `start` plus `status` if the stream cannot stay attached
 - use `detail=full` only when you need the richer lineup and absence pass
 - the direct `mode=live` route still works, but it waits for the live extraction unless a cached result already exists
 - active live runs and cached results are currently in-memory only, so restarting `npm run dev` clears them

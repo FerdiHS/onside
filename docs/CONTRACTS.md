@@ -658,6 +658,115 @@ Optional:
 
 ---
 
+## `GET /api/match-prep/stream?matchId=<id>`
+
+### Purpose
+
+Open a server-owned SSE stream for live Match Prep research in `detail=summary`, including curated progress updates and an optional TinyFish browser preview URL.
+
+### Required query params
+
+- `matchId`
+
+### Optional query params
+
+- `detail=summary`
+
+### Notes
+
+- Streaming is currently supported only for `detail=summary`.
+- The frontend should prefer this stream for live Match Prep UX, then fall back to `POST /api/match-prep/start` and `GET /api/match-prep/status` if the stream errors or disconnects.
+- The route calls TinyFish server-side and must never expose `TINYFISH_API_KEY`.
+- On completion, the route caches the same normalized and enriched `MatchPrepData` used by the polling flow.
+
+### SSE events
+
+#### `event: started`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "timestamp": "2026-03-28T12:34:56Z"
+}
+```
+
+#### `event: preview`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "streaming_url": "https://...",
+  "timestamp": "2026-03-28T12:34:58Z"
+}
+```
+
+#### `event: progress`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "label": "Opening trusted source",
+  "raw_purpose": "Open OneFootball preview page",
+  "timestamp": "2026-03-28T12:35:02Z"
+}
+```
+
+#### `event: heartbeat`
+
+```json
+{
+  "timestamp": "2026-03-28T12:35:05Z"
+}
+```
+
+#### `event: complete`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "result": {
+    "match_id": "friendly-usa-vs-belgium-2026-03-28",
+    "competition": "International Friendly",
+    "kickoff_time": "2026-03-28T19:30:00Z",
+    "home_team": "USA",
+    "away_team": "Belgium",
+    "probable_lineups": { "home": [], "away": [] },
+    "injuries_or_absences": { "home": [], "away": [] },
+    "recent_context": [],
+    "key_talking_points": [],
+    "sources": []
+  },
+  "completeness": "partial",
+  "timestamp": "2026-03-28T12:35:20Z"
+}
+```
+
+#### `event: error`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "code": "UPSTREAM_FAILURE",
+  "message": "TinyFish streaming failed before completion.",
+  "timestamp": "2026-03-28T12:35:21Z"
+}
+```
+
+### Event semantics
+
+- `started` confirms the TinyFish run was created.
+- `preview` shares a TinyFish browser preview URL when available.
+- `progress` is app-curated text and should be treated as user-facing status, not a full raw TinyFish trace.
+- `complete` returns the final `MatchPrepData` payload and should be treated as terminal.
+- `error` is terminal for the stream; the frontend should gracefully fall back to polling.
+
+---
+
 ## `GET /api/players?clubId=<id>`
 
 ### Purpose

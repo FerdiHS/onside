@@ -63,6 +63,26 @@ type TinyFishAsyncRunResponse = {
   error?: TinyFishErrorPayload | null;
 };
 
+type TinyFishStreamEventType =
+  | "STARTED"
+  | "STREAMING_URL"
+  | "PROGRESS"
+  | "COMPLETE"
+  | "HEARTBEAT"
+  | "ERROR";
+
+export type TinyFishStreamEvent = {
+  type?: TinyFishStreamEventType | string;
+  run_id?: string | null;
+  streaming_url?: string | null;
+  purpose?: string | null;
+  status?: TinyFishRunStatus | string | null;
+  result?: unknown;
+  timestamp?: string | null;
+  error?: TinyFishErrorPayload | null;
+  message?: string | null;
+};
+
 type TinyFishGoalFailureEnvelope = {
   success: false;
   error_type?: string;
@@ -113,6 +133,7 @@ export type LiveMatchPrepRunPollResult =
 
 const DEFAULT_BASE_URL = "https://agent.tinyfish.ai";
 const RUN_ENDPOINT_PATH = "/v1/automation/run";
+const RUN_SSE_ENDPOINT_PATH = "/v1/automation/run-sse";
 const RUN_ASYNC_ENDPOINT_PATH = "/v1/automation/run-async";
 const RUNS_ENDPOINT_PATH = "/v1/runs";
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
@@ -147,6 +168,21 @@ export async function startLiveMatchPrepRun(
   return {
     runId: response.run_id,
   };
+}
+
+export async function* streamLiveMatchPrepRunEvents(
+  scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
+): AsyncGenerator<TinyFishStreamEvent> {
+  const response = await requestTinyFishEventStream(
+    RUN_SSE_ENDPOINT_PATH,
+    {
+      method: "POST",
+      body: JSON.stringify(buildAutomationInput(scenario, detail)),
+    },
+  );
+
+  yield* parseTinyFishEventStream(response);
 }
 
 export async function getLiveMatchPrepRunStatus(
@@ -228,6 +264,20 @@ export async function getLiveMatchPrepRunStatus(
     streamingUrl,
     details: runDetails,
   };
+}
+
+export function interpretLiveMatchPrepStreamResult(
+  result: unknown,
+  scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
+  details?: Record<string, unknown>,
+): LiveMatchPrepResult {
+  return interpretTinyFishMatchPrepPayload(
+    result,
+    getScenarioSeed(scenario),
+    detail,
+    details,
+  );
 }
 
 export function isTinyFishConfigured(): boolean {
@@ -316,6 +366,67 @@ async function runTinyFishAutomationAsync(
   return payload as TinyFishAsyncRunResponse;
 }
 
+async function requestTinyFishEventStream(
+  path: string,
+  init: {
+    method: "POST";
+    body: string;
+  },
+): Promise<Response> {
+  const apiKey = getApiKey();
+  const timeoutMs = Math.max(getRequestTimeoutMs(), 600_000);
+  let response: Response;
+
+  try {
+    response = await fetch(`${getBaseUrl()}${path}`, {
+      method: init.method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey,
+      },
+      body: init.body,
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (isTimeoutLikeError(error)) {
+      throw new TinyFishUpstreamError(
+        `TinyFish stream request timed out after ${timeoutMs}ms.`,
+        {
+          error_name: getErrorName(error),
+          error_message: getErrorMessage(error),
+          timeout_ms: timeoutMs,
+        },
+      );
+    }
+
+    throw new TinyFishUpstreamError("Failed to reach TinyFish streaming endpoint.", {
+      error_name: getErrorName(error),
+      error_message: getErrorMessage(error),
+    });
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new TinyFishUpstreamError(
+      "TinyFish streaming endpoint returned a non-success HTTP status.",
+      {
+        status: response.status,
+        body,
+      },
+    );
+  }
+
+  if (!response.body) {
+    throw new TinyFishUpstreamError(
+      "TinyFish streaming endpoint returned no response body.",
+      { status: response.status },
+    );
+  }
+
+  return response;
+}
+
 async function getTinyFishRun(runId: string): Promise<TinyFishRunDetailsResponse> {
   const payload = await requestTinyFishJson(
     `${RUNS_ENDPOINT_PATH}/${encodeURIComponent(runId)}?screenshots=none`,
@@ -332,6 +443,69 @@ async function getTinyFishRun(runId: string): Promise<TinyFishRunDetailsResponse
   }
 
   return payload as TinyFishRunDetailsResponse;
+}
+
+async function* parseTinyFishEventStream(
+  response: Response,
+): AsyncGenerator<TinyFishStreamEvent> {
+  if (!response.body) {
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    buffer = buffer.replace(/\r\n/gu, "\n");
+
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const chunk = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+
+      const event = parseTinyFishSseChunk(chunk);
+      if (event) {
+        yield event;
+      }
+
+      boundary = buffer.indexOf("\n\n");
+    }
+
+    if (done) {
+      const finalEvent = parseTinyFishSseChunk(buffer);
+      if (finalEvent) {
+        yield finalEvent;
+      }
+      return;
+    }
+  }
+}
+
+function parseTinyFishSseChunk(chunk: string): TinyFishStreamEvent | null {
+  const trimmed = chunk.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const dataLines = trimmed
+    .split("\n")
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice("data:".length).trim());
+
+  if (dataLines.length === 0) {
+    return null;
+  }
+
+  const joined = dataLines.join("\n");
+  const parsed = tryParseJson(joined);
+  if (!isRecord(parsed)) {
+    return null;
+  }
+
+  return parsed as TinyFishStreamEvent;
 }
 
 async function requestTinyFishJson(
