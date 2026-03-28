@@ -1,6 +1,10 @@
 import "server-only";
 
-import type { Completeness, MatchPrepData } from "@/lib/schemas";
+import type {
+  Completeness,
+  MatchPrepData,
+  MatchPrepDetail,
+} from "@/lib/schemas";
 
 export type MatchPrepJobStatus =
   | "pending"
@@ -10,7 +14,9 @@ export type MatchPrepJobStatus =
   | "cancelled";
 
 type CachedMatchPrepResult = {
+  cacheKey: string;
   matchId: string;
+  detail: MatchPrepDetail;
   runId: string | null;
   data: MatchPrepData;
   completeness: Completeness;
@@ -18,7 +24,9 @@ type CachedMatchPrepResult = {
 };
 
 type ActiveMatchPrepRun = {
+  cacheKey: string;
   matchId: string;
+  detail: MatchPrepDetail;
   runId: string;
   status: Extract<MatchPrepJobStatus, "pending" | "running">;
   createdAt: string;
@@ -27,9 +35,9 @@ type ActiveMatchPrepRun = {
 };
 
 type MatchPrepStore = {
-  cachedByMatchId: Map<string, CachedMatchPrepResult>;
-  activeByMatchId: Map<string, ActiveMatchPrepRun>;
-  matchIdByRunId: Map<string, string>;
+  cachedByKey: Map<string, CachedMatchPrepResult>;
+  activeByKey: Map<string, ActiveMatchPrepRun>;
+  requestByRunId: Map<string, { matchId: string; detail: MatchPrepDetail }>;
 };
 
 declare global {
@@ -37,30 +45,37 @@ declare global {
 }
 
 const store = globalThis.__onsideMatchPrepStore ??= {
-  cachedByMatchId: new Map<string, CachedMatchPrepResult>(),
-  activeByMatchId: new Map<string, ActiveMatchPrepRun>(),
-  matchIdByRunId: new Map<string, string>(),
+  cachedByKey: new Map<string, CachedMatchPrepResult>(),
+  activeByKey: new Map<string, ActiveMatchPrepRun>(),
+  requestByRunId: new Map<string, { matchId: string; detail: MatchPrepDetail }>(),
 };
 
-export function getCachedMatchPrepResult(matchId: string): CachedMatchPrepResult | null {
-  return store.cachedByMatchId.get(matchId) ?? null;
+export function getCachedMatchPrepResult(
+  matchId: string,
+  detail: MatchPrepDetail,
+): CachedMatchPrepResult | null {
+  return store.cachedByKey.get(createMatchPrepCacheKey(matchId, detail)) ?? null;
 }
 
 export function setCachedMatchPrepResult(input: {
   matchId: string;
+  detail: MatchPrepDetail;
   runId: string | null;
   data: MatchPrepData;
   completeness: Completeness;
 }): CachedMatchPrepResult {
+  const cacheKey = createMatchPrepCacheKey(input.matchId, input.detail);
   const cached: CachedMatchPrepResult = {
+    cacheKey,
     matchId: input.matchId,
+    detail: input.detail,
     runId: input.runId,
     data: input.data,
     completeness: input.completeness,
     updatedAt: new Date().toISOString(),
   };
 
-  store.cachedByMatchId.set(input.matchId, cached);
+  store.cachedByKey.set(cacheKey, cached);
   if (input.runId) {
     clearActiveMatchPrepRun(input.runId);
   }
@@ -70,29 +85,36 @@ export function setCachedMatchPrepResult(input: {
 
 export function getActiveMatchPrepRunByMatchId(
   matchId: string,
+  detail: MatchPrepDetail,
 ): ActiveMatchPrepRun | null {
-  return store.activeByMatchId.get(matchId) ?? null;
+  return store.activeByKey.get(createMatchPrepCacheKey(matchId, detail)) ?? null;
 }
 
 export function getActiveMatchPrepRunByRunId(runId: string): ActiveMatchPrepRun | null {
-  const matchId = store.matchIdByRunId.get(runId);
-  if (!matchId) {
+  const request = store.requestByRunId.get(runId);
+  if (!request) {
     return null;
   }
 
-  const active = store.activeByMatchId.get(matchId);
+  const active = store.activeByKey.get(
+    createMatchPrepCacheKey(request.matchId, request.detail),
+  );
   return active?.runId === runId ? active : null;
 }
 
 export function registerActiveMatchPrepRun(input: {
   matchId: string;
+  detail: MatchPrepDetail;
   runId: string;
   status?: Extract<MatchPrepJobStatus, "pending" | "running">;
   streamingUrl?: string | null;
 }): ActiveMatchPrepRun {
   const now = new Date().toISOString();
+  const cacheKey = createMatchPrepCacheKey(input.matchId, input.detail);
   const active: ActiveMatchPrepRun = {
+    cacheKey,
     matchId: input.matchId,
+    detail: input.detail,
     runId: input.runId,
     status: input.status ?? "pending",
     createdAt: now,
@@ -100,8 +122,11 @@ export function registerActiveMatchPrepRun(input: {
     streamingUrl: input.streamingUrl ?? null,
   };
 
-  store.activeByMatchId.set(input.matchId, active);
-  store.matchIdByRunId.set(input.runId, input.matchId);
+  store.activeByKey.set(cacheKey, active);
+  store.requestByRunId.set(input.runId, {
+    matchId: input.matchId,
+    detail: input.detail,
+  });
   return active;
 }
 
@@ -123,23 +148,34 @@ export function updateActiveMatchPrepRun(input: {
     updatedAt: new Date().toISOString(),
   };
 
-  store.activeByMatchId.set(active.matchId, updated);
+  store.activeByKey.set(updated.cacheKey, updated);
   return updated;
 }
 
 export function clearActiveMatchPrepRun(runId: string): void {
-  const matchId = store.matchIdByRunId.get(runId);
-  if (!matchId) {
+  const request = store.requestByRunId.get(runId);
+  if (!request) {
     return;
   }
 
-  store.matchIdByRunId.delete(runId);
-  const active = store.activeByMatchId.get(matchId);
+  store.requestByRunId.delete(runId);
+  const active = store.activeByKey.get(
+    createMatchPrepCacheKey(request.matchId, request.detail),
+  );
   if (active?.runId === runId) {
-    store.activeByMatchId.delete(matchId);
+    store.activeByKey.delete(active.cacheKey);
   }
 }
 
-export function getKnownMatchIdForRunId(runId: string): string | null {
-  return store.matchIdByRunId.get(runId) ?? null;
+export function getKnownMatchPrepRequestForRunId(
+  runId: string,
+): { matchId: string; detail: MatchPrepDetail } | null {
+  return store.requestByRunId.get(runId) ?? null;
+}
+
+export function createMatchPrepCacheKey(
+  matchId: string,
+  detail: MatchPrepDetail,
+): string {
+  return `${matchId}::${detail}`;
 }

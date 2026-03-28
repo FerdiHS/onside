@@ -1,6 +1,7 @@
 export type WatchStatus = "rising" | "stable" | "concern";
 export type DataMode = "mock" | "live";
 export type Completeness = "full" | "partial";
+export type MatchPrepDetail = "summary" | "full";
 export type FailureCode =
   | "BAD_REQUEST"
   | "NOT_FOUND"
@@ -12,6 +13,7 @@ export type ResponseMeta = {
   mode: DataMode;
   completeness: Completeness;
   generated_at: string;
+  detail?: MatchPrepDetail;
   progress_supported?: boolean;
 };
 
@@ -128,6 +130,10 @@ export function isDataMode(value: string): value is DataMode {
   return value === "mock" || value === "live";
 }
 
+export function isMatchPrepDetail(value: string): value is MatchPrepDetail {
+  return value === "summary" || value === "full";
+}
+
 export function inferDomain(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -140,6 +146,7 @@ export function inferDomain(url: string): string | null {
 export function normalizeMatchPrepData(
   value: unknown,
   seed: MatchPrepSeedContext,
+  detail: MatchPrepDetail = "full",
 ): MatchPrepNormalizationResult {
   const issues: string[] = [];
   const record = isRecord(value) ? value : {};
@@ -172,14 +179,14 @@ export function normalizeMatchPrepData(
   const probableLineupsRecord = isRecord(record.probable_lineups)
     ? record.probable_lineups
     : {};
-  if (!isRecord(record.probable_lineups)) {
+  if (detail === "full" && !isRecord(record.probable_lineups)) {
     completeness = "partial";
     issues.push("probable_lineups");
   }
 
   const homeLineup = readStringArray(probableLineupsRecord.home);
   const awayLineup = readStringArray(probableLineupsRecord.away);
-  if (homeLineup.missing || awayLineup.missing) {
+  if (detail === "full" && (homeLineup.missing || awayLineup.missing)) {
     completeness = "partial";
     issues.push("probable_lineups.home", "probable_lineups.away");
   }
@@ -187,14 +194,14 @@ export function normalizeMatchPrepData(
   const absencesRecord = isRecord(record.injuries_or_absences)
     ? record.injuries_or_absences
     : {};
-  if (!isRecord(record.injuries_or_absences)) {
+  if (detail === "full" && !isRecord(record.injuries_or_absences)) {
     completeness = "partial";
     issues.push("injuries_or_absences");
   }
 
   const homeAbsences = readStringArray(absencesRecord.home);
   const awayAbsences = readStringArray(absencesRecord.away);
-  if (homeAbsences.missing || awayAbsences.missing) {
+  if (detail === "full" && (homeAbsences.missing || awayAbsences.missing)) {
     completeness = "partial";
     issues.push("injuries_or_absences.home", "injuries_or_absences.away");
   }

@@ -1,11 +1,38 @@
 import type { MatchPrepScenario } from "@/lib/mock-data";
+import type { MatchPrepDetail } from "@/lib/schemas";
 
-export function buildMatchPrepGoal(scenario: MatchPrepScenario): string {
+export function buildMatchPrepGoal(
+  scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
+): string {
   const { mock, live_source_pack, live_notes } = scenario;
   const allowedDomains = [
     live_source_pack.primary,
     ...live_source_pack.supporting,
   ].map((source) => source.domain ?? new URL(source.url).hostname);
+  const isSummaryOnly = detail === "summary";
+  const stopConditions = isSummaryOnly
+    ? [
+        "- You have enough for a concise summary: recent_context, key_talking_points, and at least one trustworthy source.",
+        "- The primary source alone already gives enough reliable context for the summary view.",
+        "- The site is blocked, requires login, or cannot provide reliable data.",
+      ]
+    : [
+        "- The requested fields are complete or intentionally empty.",
+        "- The primary source plus one trustworthy supporting source have been checked.",
+        "- The site is blocked, requires login, or cannot provide reliable data.",
+      ];
+  const detailGuidance = isSummaryOnly
+    ? [
+        "This request is for the fast summary view.",
+        "Prioritize recent_context, key_talking_points, and sources.",
+        "Do not spend extra time chasing probable_lineups or injuries_or_absences.",
+        "If probable_lineups or injuries_or_absences are not obvious on the current page, return them as empty arrays immediately.",
+      ]
+    : [
+        "This request is for the full match-prep view.",
+        "Collect probable_lineups, injuries_or_absences, recent_context, key_talking_points, and sources when available.",
+      ];
 
   return [
     "You are gathering football match-prep intelligence for a club-facing dashboard.",
@@ -35,6 +62,7 @@ export function buildMatchPrepGoal(scenario: MatchPrepScenario): string {
     "",
     "Start at the primary source URL. Use the supporting URLs only if needed to complete missing fields for this exact fixture.",
     "Stay on the curated source pack domains. Do not browse the wider web unless none of the curated sources contain the required data.",
+    ...detailGuidance.map((line) => line),
     "",
     "Return JSON only with exactly one of these shapes:",
     "{",
@@ -83,9 +111,7 @@ export function buildMatchPrepGoal(scenario: MatchPrepScenario): string {
     "- Ignore unrelated fixtures involving the same clubs.",
     "",
     "Stop when ANY of these is true:",
-    "- The requested fields are complete or intentionally empty.",
-    "- The primary source plus one trustworthy supporting source have been checked.",
-    "- The site is blocked, requires login, or cannot provide reliable data.",
+    ...stopConditions,
     ...live_notes.map((note) => `- ${note}`),
   ].join("\n");
 }

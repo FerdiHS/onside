@@ -6,6 +6,7 @@ import {
 } from "@/lib/mock-data";
 import { getCachedMatchPrepResult, setCachedMatchPrepResult } from "@/lib/match-prep-jobs";
 import {
+  resolveMatchPrepDetail,
   mapMatchPrepRuntimeError,
   resolveMatchPrepMode,
 } from "@/lib/match-prep-runtime";
@@ -14,6 +15,7 @@ import {
   createMeta,
   failureStatusCode,
   isDataMode,
+  isMatchPrepDetail,
 } from "@/lib/schemas";
 import { getLiveMatchPrep } from "@/lib/tinyfish";
 
@@ -23,6 +25,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const matchId = request.nextUrl.searchParams.get("matchId")?.trim();
   const modeParam = request.nextUrl.searchParams.get("mode")?.trim();
+  const detailParam = request.nextUrl.searchParams.get("detail")?.trim();
 
   if (!matchId) {
     const failure = createFailureResponse(
@@ -51,6 +54,21 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  if (detailParam && !isMatchPrepDetail(detailParam)) {
+    const failure = createFailureResponse(
+      "BAD_REQUEST",
+      'detail must be either "summary" or "full".',
+      createMeta("mock", "partial"),
+      {
+        received: detailParam,
+      },
+    );
+
+    return Response.json(failure, {
+      status: failureStatusCode(failure.error.code),
+    });
+  }
+
   const scenario = getMatchPrepScenario(matchId);
   if (!scenario) {
     const failure = createFailureResponse(
@@ -65,27 +83,31 @@ export async function GET(request: NextRequest) {
   }
 
   const mode = resolveMatchPrepMode(modeParam);
+  const detail = resolveMatchPrepDetail(detailParam);
   if (mode === "mock") {
-    return Response.json(createMockMatchPrepResponse(scenario));
+    return Response.json(createMockMatchPrepResponse(scenario, detail));
   }
 
-  const cached = getCachedMatchPrepResult(matchId);
+  const cached = getCachedMatchPrepResult(matchId, detail);
   if (cached) {
     return Response.json({
       success: true,
       data: cached.data,
-      meta: createMeta("live", cached.completeness, { progress_supported: true }),
+      meta: createMeta("live", cached.completeness, {
+        progress_supported: true,
+        detail,
+      }),
     });
   }
 
   try {
-    const result = await getLiveMatchPrep(scenario);
+    const result = await getLiveMatchPrep(scenario, detail);
 
     if (result.kind === "failure") {
       const failure = createFailureResponse(
         result.code,
         result.message,
-        createMeta("live", "partial", { progress_supported: true }),
+        createMeta("live", "partial", { progress_supported: true, detail }),
         result.details,
       );
 
@@ -96,6 +118,7 @@ export async function GET(request: NextRequest) {
 
     setCachedMatchPrepResult({
       matchId,
+      detail,
       runId: null,
       data: result.data,
       completeness: result.completeness,
@@ -104,10 +127,13 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: result.data,
-      meta: createMeta("live", result.completeness, { progress_supported: true }),
+      meta: createMeta("live", result.completeness, {
+        progress_supported: true,
+        detail,
+      }),
     });
   } catch (error) {
-    const failure = mapMatchPrepRuntimeError(error);
+    const failure = mapMatchPrepRuntimeError(error, detail);
 
     return Response.json(failure, {
       status: failureStatusCode(failure.error.code),

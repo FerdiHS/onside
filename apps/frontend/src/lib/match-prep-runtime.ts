@@ -1,6 +1,7 @@
 import {
   createFailureResponse,
   createMeta,
+  type MatchPrepDetail,
   type FailureResponse,
 } from "@/lib/schemas";
 import {
@@ -21,12 +22,19 @@ export function resolveMatchPrepMode(modeParam?: string): "mock" | "live" {
   return "mock";
 }
 
-export function mapMatchPrepRuntimeError(error: unknown): FailureResponse {
+export function resolveMatchPrepDetail(detailParam?: string): MatchPrepDetail {
+  return detailParam === "summary" ? "summary" : "full";
+}
+
+export function mapMatchPrepRuntimeError(
+  error: unknown,
+  detail: MatchPrepDetail = "full",
+): FailureResponse {
   if (error instanceof TinyFishConfigError) {
     return createFailureResponse(
       "INTERNAL_ERROR",
       error.message,
-      createMeta("live", "partial", { progress_supported: true }),
+      createMeta("live", "partial", { progress_supported: true, detail }),
     );
   }
 
@@ -34,7 +42,7 @@ export function mapMatchPrepRuntimeError(error: unknown): FailureResponse {
     return createFailureResponse(
       "UPSTREAM_FAILURE",
       error.message,
-      createMeta("live", "partial", { progress_supported: true }),
+      createMeta("live", "partial", { progress_supported: true, detail }),
       error.details,
     );
   }
@@ -42,6 +50,6 @@ export function mapMatchPrepRuntimeError(error: unknown): FailureResponse {
   return createFailureResponse(
     "INTERNAL_ERROR",
     "Unexpected error while building match prep.",
-    createMeta("live", "partial", { progress_supported: true }),
+    createMeta("live", "partial", { progress_supported: true, detail }),
   );
 }

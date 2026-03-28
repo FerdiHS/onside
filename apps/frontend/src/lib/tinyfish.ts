@@ -7,6 +7,7 @@ import {
   type Completeness,
   type FailureCode,
   type MatchPrepData,
+  type MatchPrepDetail,
   type MatchPrepSeedContext,
 } from "@/lib/schemas";
 
@@ -118,20 +119,23 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
 
 export async function getLiveMatchPrep(
   scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
 ): Promise<LiveMatchPrepResult> {
-  const response = await runTinyFishAutomation(buildAutomationInput(scenario));
+  const response = await runTinyFishAutomation(buildAutomationInput(scenario, detail));
 
   return interpretTinyFishMatchPrepPayload(
     unwrapTinyFishResult(response),
     getScenarioSeed(scenario),
+    detail,
     getRunDetails(response),
   );
 }
 
 export async function startLiveMatchPrepRun(
   scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
 ): Promise<{ runId: string }> {
-  const response = await runTinyFishAutomationAsync(buildAutomationInput(scenario));
+  const response = await runTinyFishAutomationAsync(buildAutomationInput(scenario, detail));
 
   if (!response.run_id) {
     throw new TinyFishUpstreamError(
@@ -148,6 +152,7 @@ export async function startLiveMatchPrepRun(
 export async function getLiveMatchPrepRunStatus(
   runId: string,
   scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
 ): Promise<LiveMatchPrepRunPollResult> {
   const run = await getTinyFishRun(runId);
   const runDetails = getRunDetails(run);
@@ -198,6 +203,7 @@ export async function getLiveMatchPrepRunStatus(
   const interpreted = interpretTinyFishMatchPrepPayload(
     run.result,
     getScenarioSeed(scenario),
+    detail,
     runDetails,
   );
 
@@ -245,10 +251,13 @@ export class TinyFishUpstreamError extends Error {
   }
 }
 
-function buildAutomationInput(scenario: MatchPrepScenario): TinyFishRunRequest {
+function buildAutomationInput(
+  scenario: MatchPrepScenario,
+  detail: MatchPrepDetail,
+): TinyFishRunRequest {
   return {
     url: scenario.live_source_pack.primary.url,
-    goal: buildMatchPrepGoal(scenario),
+    goal: buildMatchPrepGoal(scenario, detail),
     browser_profile: getBrowserProfile(),
     proxy_config: getProxyConfig(),
     api_integration: "onside",
@@ -408,6 +417,7 @@ function unwrapTinyFishResult(response: TinyFishRunResponse): unknown {
 function interpretTinyFishMatchPrepPayload(
   result: unknown,
   seed: MatchPrepSeedContext,
+  detail: MatchPrepDetail,
   details?: Record<string, unknown>,
 ): LiveMatchPrepResult {
   const structuredResult = coerceStructuredValue(result);
@@ -415,7 +425,7 @@ function interpretTinyFishMatchPrepPayload(
   if (isGoalFailureEnvelope(structuredResult)) {
     const partialCandidate = structuredResult.partial_data ?? structuredResult.data;
     if (partialCandidate !== undefined) {
-      const normalized = normalizeMatchPrepData(partialCandidate, seed);
+      const normalized = normalizeMatchPrepData(partialCandidate, seed, detail);
       if (normalized.hasMeaningfulSignals) {
         return {
           kind: "success",
@@ -439,7 +449,7 @@ function interpretTinyFishMatchPrepPayload(
   }
 
   const payload = unwrapGoalSuccessPayload(structuredResult);
-  const normalized = normalizeMatchPrepData(payload, seed);
+  const normalized = normalizeMatchPrepData(payload, seed, detail);
 
   if (!normalized.hasMeaningfulSignals) {
     return {
