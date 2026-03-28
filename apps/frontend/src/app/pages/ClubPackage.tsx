@@ -216,7 +216,6 @@ export function ClubPackage() {
   const [loanMonitorError, setLoanMonitorError] = useState<string | null>(null);
   const [loanMonitorPlayers, setLoanMonitorPlayers] = useState<ClubPlayer[] | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollLoanMonitorRef = useRef<((nextRunId?: string) => Promise<void>) | null>(null);
 
   const clearLoanMonitorPoll = useEffectEvent(() => {
     if (pollTimeoutRef.current) {
@@ -253,10 +252,6 @@ export function ClubPackage() {
           window.sessionStorage.setItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY, payload.runId);
         }
 
-        pollTimeoutRef.current = setTimeout(() => {
-          void pollLoanMonitorRef.current?.(payload.runId);
-        }, 1500);
-
         return;
       }
 
@@ -286,8 +281,6 @@ export function ClubPackage() {
       clearStoredLoanMonitorRunId();
     }
   });
-
-  pollLoanMonitorRef.current = pollLoanMonitor;
 
   useEffect(() => {
     if (selectedClub !== 'Chelsea') {
@@ -332,6 +325,20 @@ export function ClubPackage() {
       clearLoanMonitorPoll();
     };
   }, [selectedClub]);
+
+  useEffect(() => {
+    if (selectedClub !== 'Chelsea' || loanMonitorStatus !== 'polling' || !loanMonitorRunId) {
+      return;
+    }
+
+    pollTimeoutRef.current = setTimeout(() => {
+      void pollLoanMonitor(loanMonitorRunId);
+    }, 1500);
+
+    return () => {
+      clearLoanMonitorPoll();
+    };
+  }, [loanMonitorRunId, loanMonitorStatus, pollLoanMonitor, selectedClub]);
 
   const baseClub = clubData[selectedClub] ?? clubData['Chelsea'];
   const current =
