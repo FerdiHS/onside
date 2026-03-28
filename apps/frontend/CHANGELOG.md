@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/FerdiHS/onside/compare/v0.4.0...v0.5.0) (2026-03-28)
+
+
+### Features
+
+* **backend:** add validation schemas and zod setup ([#35](https://github.com/FerdiHS/onside/issues/35)) ([89b154f](https://github.com/FerdiHS/onside/commit/89b154f85caf548d797396ea10933f9de0dce176))
+
 ## [0.4.0](https://github.com/FerdiHS/onside/compare/v0.3.0...v0.4.0) (2026-03-28)
 
 
