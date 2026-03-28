@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/FerdiHS/onside/compare/v0.5.0...v0.5.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* harden match prep polling and fixture freshness ([#42](https://github.com/FerdiHS/onside/issues/42)) ([27e1a96](https://github.com/FerdiHS/onside/commit/27e1a965d06f62044715a395a763e4c767d6a8b0))
+
 ## [0.5.0](https://github.com/FerdiHS/onside/compare/v0.4.0...v0.5.0) (2026-03-28)
 
 ### Features
