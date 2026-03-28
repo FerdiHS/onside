@@ -1,55 +1,64 @@
-'use client'
+'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';  
+import { usePathname } from 'next/navigation';
 import { Activity, ClipboardList, Users, Building2 } from 'lucide-react';
 
+const navItems = [
+  { path: '/', label: 'Home', icon: Activity },
+  { path: '/match-prep', label: 'Match Prep', icon: ClipboardList },
+  { path: '/player-watch', label: 'Player Watch', icon: Users },
+  { path: '/club-package', label: 'Club Package', icon: Building2 },
+];
+
 export function Navigation() {
-  const pathname = usePathname()
-  
-  const navItems = [
-    { path: '/', label: 'Home', icon: Activity },
-    { path: '/match-prep', label: 'Match Prep', icon: ClipboardList },
-    { path: '/player-watch', label: 'Player Watch', icon: Users },
-    { path: '/club-package', label: 'Club Package', icon: Building2 },
-  ];
-  
+  const pathname = usePathname();
+
   return (
-    <nav className="border-b" style={{ borderColor: 'var(--bg-border)', backgroundColor: 'var(--bg-surface)' }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <Activity className="w-6 h-6" style={{ color: 'var(--accent-blue)' }} />
-              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Onside
-              </span>
-            </Link>
-            
-            <div className="flex gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.path;
-                
-                return (
-                  <Link
-                    key={item.path}
-                    href={item.path}
-                    className="flex items-center gap-2 px-4 py-2 rounded transition-colors"
-                    style={{
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      backgroundColor: isActive ? 'var(--bg-card)' : 'transparent',
-                    }}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+    <nav style={{
+      backgroundColor: '#0b1120',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      height: '56px',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '0 32px',
+      gap: '4px',
+    }}>
+      {/* Brand */}
+      <Link href="/" style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '7px',
+        textDecoration: 'none',
+        marginRight: '16px',
+      }}>
+        <Activity size={17} color="#4a9eff" strokeWidth={2.5} />
+        <span style={{ color: '#e8edf5', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.01em' }}>
+          Onside
+        </span>
+      </Link>
+
+      {/* Nav links */}
+      {navItems.map(({ path, label, icon: Icon }) => {
+        const isActive = pathname === path;
+        return (
+          <Link key={path} href={path} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 13px',
+            borderRadius: '7px',
+            fontSize: '13.5px',
+            fontWeight: isActive ? 500 : 400,
+            textDecoration: 'none',
+            color: isActive ? '#c8d8f0' : '#6b7fa3',
+            backgroundColor: isActive ? 'rgba(74,158,255,0.12)' : 'transparent',
+          }}>
+            <Icon size={13} color={isActive ? '#4a9eff' : '#6b7fa3'} strokeWidth={2.5} />
+            {label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
