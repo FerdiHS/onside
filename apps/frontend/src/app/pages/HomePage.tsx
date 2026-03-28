@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ClipboardList, Users, Building2, Calendar, Fish, Activity } from 'lucide-react';
+import { ClipboardList, Users, Building2, Calendar, Fish } from 'lucide-react';
 import { ClubBadge } from '../components/ClubBadge';
 
 const upcomingMatches = [
