@@ -5,8 +5,8 @@ import { ClipboardList, Users, Building2, Calendar, Fish } from 'lucide-react';
 import { ClubBadge } from '../components/ClubBadge';
 
 const upcomingMatches = [
-  { home: 'Chelsea', away: 'Arsenal', competition: 'Premier League', date: 'Mar 29, 2026', time: '15:00 GMT' },
-  { home: 'Manchester United', away: 'Liverpool', competition: 'Premier League', date: 'Mar 30, 2026', time: '16:30 GMT' },
+  { id: "chelsea-vs-arsenal", home: 'Chelsea', away: 'Arsenal', competition: 'Premier League', date: 'Mar 29, 2026', time: '15:00 GMT' },
+  { id: "manchester-united-vs-liverpool", home: 'Manchester United', away: 'Liverpool', competition: 'Premier League', date: 'Mar 30, 2026', time: '16:30 GMT' },
 ];
 
 const workflows = [
@@ -99,7 +99,7 @@ export function Home() {
                     </div>
                   </div>
                 </div>
-                <Link href="/match-prep" style={{
+                <Link href={`/match-prep/${match.id}`} style={{
                   padding: '8px 18px',
                   borderRadius: '8px',
                   fontSize: '13px',

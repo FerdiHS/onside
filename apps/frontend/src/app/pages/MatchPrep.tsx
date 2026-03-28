@@ -1,51 +1,130 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { ClubBadge } from '../components/ClubBadge';
 
-const match = {
-  home: 'Chelsea',
-  away: 'Arsenal',
-  competition: 'Premier League',
-  kickoff: 'Mar 29, 2026 at 15:00 GMT',
+type Lineup = {
+  formation: string;
+  goalkeeper: string[];
+  defenders: string[];
+  midfielders: string[];
+  forwards: string[];
+};
+type MatchPrepProps = {
+  params: {
+    matchId: string;
+  };
 };
 
-const sources = [
-  { title: 'Chelsea Official Team News', domain: 'chelseafc.com' },
-  { title: 'Arsenal Pre-Match Press Conference', domain: 'arsenal.com' },
-  { title: 'Premier League Injury Report', domain: 'premierleague.com' },
-  { title: 'Sky Sports Match Preview', domain: 'skysports.com' },
-];
-
-const chelseaLineup = {
-  formation: '4-3-3',
-  goalkeeper: ['Sánchez'],
-  defenders: ['James', 'Fofana', 'Colwill', 'Chilwell'],
-  midfielders: ['Caicedo', 'Enzo', 'Gallagher'],
-  forwards: ['Palmer', 'Jackson', 'Sterling'],
+type Injury = {
+  team: string;
+  player: string;
+  status: string;
+  issue: string;
 };
 
-const arsenalLineup = {
-  formation: '4-3-3',
-  goalkeeper: ['Raya'],
-  defenders: ['White', 'Saliba', 'Gabriel', 'Timber'],
-  midfielders: ['Rice', 'Ødegaard', 'Havertz'],
-  forwards: ['Saka', 'Trossard', 'Martinelli'],
+type Source = {
+  title: string;
+  domain: string;
 };
 
-const injuries = [
-  { team: 'Chelsea', player: 'Reece James', status: 'Doubtful', issue: 'Hamstring' },
-  { team: 'Arsenal', player: 'Thomas Partey', status: 'Out', issue: 'Muscle injury' },
-];
+type MatchPrepData = {
+  match: {
+    home: string;
+    away: string;
+    competition: string;
+    kickoff: string;
+  };
+  homeLineup: Lineup;
+  awayLineup: Lineup;
+  injuries: Injury[];
+  keyPoints: string[];
+  homeForm: string[];
+  awayForm: string[];
+  sources: Source[];
+};
 
-const keyPoints = [
-  'Arsenal unbeaten in last 5 matches, while Chelsea won 3 of last 5',
-  'Both teams strong defensively — Arsenal 2nd best, Chelsea 4th best defensive records',
-  'Cole Palmer has 8 goals in last 10 games for Chelsea',
-];
+const matchPrepData: Record<string, MatchPrepData> = {
+  'chelsea-vs-arsenal': {
+    match: {
+      home: 'Chelsea',
+      away: 'Arsenal',
+      competition: 'Premier League',
+      kickoff: 'Mar 29, 2026 at 15:00 GMT',
+    },
+    homeLineup: {
+      formation: '4-3-3',
+      goalkeeper: ['Sánchez'],
+      defenders: ['James', 'Fofana', 'Colwill', 'Chilwell'],
+      midfielders: ['Caicedo', 'Enzo', 'Gallagher'],
+      forwards: ['Palmer', 'Jackson', 'Sterling'],
+    },
+    awayLineup: {
+      formation: '4-3-3',
+      goalkeeper: ['Raya'],
+      defenders: ['White', 'Saliba', 'Gabriel', 'Timber'],
+      midfielders: ['Rice', 'Ødegaard', 'Havertz'],
+      forwards: ['Saka', 'Trossard', 'Martinelli'],
+    },
+    injuries: [
+      { team: 'Chelsea', player: 'Reece James', status: 'Doubtful', issue: 'Hamstring' },
+      { team: 'Arsenal', player: 'Thomas Partey', status: 'Out', issue: 'Muscle injury' },
+    ],
+    keyPoints: [
+      'Arsenal unbeaten in last 5 matches, while Chelsea won 3 of last 5',
+      'Both teams strong defensively — Arsenal 2nd best, Chelsea 4th best defensive records',
+      'Cole Palmer has 8 goals in last 10 games for Chelsea',
+    ],
+    homeForm: ['W', 'W', 'D', 'W', 'L'],
+    awayForm: ['W', 'W', 'W', 'D', 'W'],
+    sources: [
+      { title: 'Chelsea Official Team News', domain: 'chelseafc.com' },
+      { title: 'Arsenal Pre-Match Press Conference', domain: 'arsenal.com' },
+      { title: 'Premier League Injury Report', domain: 'premierleague.com' },
+      { title: 'Sky Sports Match Preview', domain: 'skysports.com' },
+    ],
+  },
 
-const chelseaForm = ['W', 'W', 'D', 'W', 'L'];
-const arsenalForm = ['W', 'W', 'W', 'D', 'W'];
+  'manchester-united-vs-liverpool': {
+    match: {
+      home: 'Manchester United',
+      away: 'Liverpool',
+      competition: 'Premier League',
+      kickoff: 'Mar 30, 2026 at 16:30 GMT',
+    },
+    homeLineup: {
+      formation: '4-2-3-1',
+      goalkeeper: ['Onana'],
+      defenders: ['Dalot', 'Varane', 'Martínez', 'Shaw'],
+      midfielders: ['Mainoo', 'Casemiro', 'Bruno Fernandes'],
+      forwards: ['Garnacho', 'Højlund', 'Rashford'],
+    },
+    awayLineup: {
+      formation: '4-3-3',
+      goalkeeper: ['Alisson'],
+      defenders: ['Alexander-Arnold', 'Konaté', 'Van Dijk', 'Robertson'],
+      midfielders: ['Mac Allister', 'Szoboszlai', 'Endo'],
+      forwards: ['Salah', 'Núñez', 'Luis Díaz'],
+    },
+    injuries: [
+      { team: 'Manchester United', player: 'Luke Shaw', status: 'Doubtful', issue: 'Knock' },
+      { team: 'Liverpool', player: 'Diogo Jota', status: 'Out', issue: 'Hamstring' },
+    ],
+    keyPoints: [
+      'Liverpool have scored 11 goals in their last 3 matches',
+      'Manchester United remain dangerous in transition at Old Trafford',
+      'Mohamed Salah is in red-hot form entering this fixture',
+    ],
+    homeForm: ['W', 'L', 'D', 'W', 'W'],
+    awayForm: ['W', 'W', 'W', 'W', 'D'],
+    sources: [
+      { title: 'Manchester United Team News', domain: 'manutd.com' },
+      { title: 'Liverpool Match Centre', domain: 'liverpoolfc.com' },
+      { title: 'Premier League Injury Update', domain: 'premierleague.com' },
+    ],
+  },
+};
 
 function resultColor(result: string): { bg: string; text: string } {
   if (result === 'W') return { bg: 'rgba(52,211,153,0.15)', text: '#34d399' };
@@ -56,15 +135,17 @@ function resultColor(result: string): { bg: string; text: string } {
 function StatusBadge({ status }: { status: string }) {
   const isOut = status === 'Out';
   return (
-    <span style={{
-      padding: '3px 10px',
-      borderRadius: '5px',
-      fontSize: '12px',
-      fontWeight: 600,
-      backgroundColor: isOut ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)',
-      color: isOut ? '#f87171' : '#fbbf24',
-      border: `1px solid ${isOut ? 'rgba(248,113,113,0.3)' : 'rgba(251,191,36,0.3)'}`,
-    }}>
+    <span
+      style={{
+        padding: '3px 10px',
+        borderRadius: '5px',
+        fontSize: '12px',
+        fontWeight: 600,
+        backgroundColor: isOut ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)',
+        color: isOut ? '#f87171' : '#fbbf24',
+        border: `1px solid ${isOut ? 'rgba(248,113,113,0.3)' : 'rgba(251,191,36,0.3)'}`,
+      }}
+    >
       {status}
     </span>
   );
@@ -73,7 +154,16 @@ function StatusBadge({ status }: { status: string }) {
 function LineupSection({ label, players }: { label: string; players: string[] }) {
   return (
     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-      <span style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', width: '30px', paddingTop: '2px', flexShrink: 0 }}>
+      <span
+        style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          color: '#4a5568',
+          width: '30px',
+          paddingTop: '2px',
+          flexShrink: 0,
+        }}
+      >
         {label}
       </span>
       <span style={{ fontSize: '13.5px', color: '#e8edf5', lineHeight: 1.6 }}>
@@ -90,12 +180,27 @@ const card: React.CSSProperties = {
   padding: '24px',
 };
 
-export function MatchPrep() {
+export default function MatchPrep({ params }: MatchPrepProps) {
+  const matchId = params.matchId;
+
+  const data =
+    matchPrepData[matchId] ??
+    matchPrepData['chelsea-vs-arsenal'];
+
+  const {
+    match,
+    homeLineup,
+    awayLineup,
+    injuries,
+    keyPoints,
+    homeForm,
+    awayForm,
+    sources,
+  } = data;
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0e1521' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 32px' }}>
-
-        {/* Header */}
         <div style={{ marginBottom: '36px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
@@ -103,16 +208,18 @@ export function MatchPrep() {
                 <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#e8edf5', letterSpacing: '-0.02em' }}>
                   {match.home} vs {match.away}
                 </h1>
-                <span style={{
-                  padding: '3px 10px',
-                  borderRadius: '5px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  backgroundColor: 'rgba(74,158,255,0.15)',
-                  color: '#4a9eff',
-                  border: '1px solid rgba(74,158,255,0.3)',
-                  letterSpacing: '0.05em',
-                }}>
+                <span
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(74,158,255,0.15)',
+                    color: '#4a9eff',
+                    border: '1px solid rgba(74,158,255,0.3)',
+                    letterSpacing: '0.05em',
+                  }}
+                >
                   LIVE
                 </span>
               </div>
@@ -122,80 +229,80 @@ export function MatchPrep() {
                 <span style={{ fontSize: '14px', color: '#6b7fa3' }}>{match.kickoff}</span>
               </div>
             </div>
-            <button style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              backgroundColor: '#1a2540',
-              color: '#e8edf5',
-              border: '1px solid rgba(255,255,255,0.07)',
-              cursor: 'pointer',
-              fontSize: '13px',
-            }}>
+
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                backgroundColor: '#1a2540',
+                color: '#e8edf5',
+                border: '1px solid rgba(255,255,255,0.07)',
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
               <RefreshCw size={14} />
               Refresh
             </button>
           </div>
         </div>
-
-        {/* Two column layout */}
+                
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
-
-          {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-            {/* Probable Lineups */}
             <div style={card}>
               <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#e8edf5', marginBottom: '24px' }}>
                 Probable Lineups
               </h2>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-                {/* Chelsea */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                    <ClubBadge club="Chelsea" size="md" />
-                    <span style={{ fontSize: '12px', color: '#4a5568' }}>{chelseaLineup.formation}</span>
+                    <ClubBadge club={match.home} size="md" />
+                    <span style={{ fontSize: '12px', color: '#4a5568' }}>{homeLineup.formation}</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <LineupSection label="GK" players={chelseaLineup.goalkeeper} />
-                    <LineupSection label="DEF" players={chelseaLineup.defenders} />
-                    <LineupSection label="MID" players={chelseaLineup.midfielders} />
-                    <LineupSection label="FWD" players={chelseaLineup.forwards} />
+                    <LineupSection label="GK" players={homeLineup.goalkeeper} />
+                    <LineupSection label="DEF" players={homeLineup.defenders} />
+                    <LineupSection label="MID" players={homeLineup.midfielders} />
+                    <LineupSection label="FWD" players={homeLineup.forwards} />
                   </div>
                 </div>
-                {/* Arsenal */}
+
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                    <ClubBadge club="Arsenal" size="md" />
-                    <span style={{ fontSize: '12px', color: '#4a5568' }}>{arsenalLineup.formation}</span>
+                    <ClubBadge club={match.away} size="md" />
+                    <span style={{ fontSize: '12px', color: '#4a5568' }}>{awayLineup.formation}</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <LineupSection label="GK" players={arsenalLineup.goalkeeper} />
-                    <LineupSection label="DEF" players={arsenalLineup.defenders} />
-                    <LineupSection label="MID" players={arsenalLineup.midfielders} />
-                    <LineupSection label="FWD" players={arsenalLineup.forwards} />
+                    <LineupSection label="GK" players={awayLineup.goalkeeper} />
+                    <LineupSection label="DEF" players={awayLineup.defenders} />
+                    <LineupSection label="MID" players={awayLineup.midfielders} />
+                    <LineupSection label="FWD" players={awayLineup.forwards} />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Injuries & Absences */}
             <div style={card}>
               <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#e8edf5', marginBottom: '16px' }}>
                 Injuries & Absences
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {injuries.map((injury, i) => (
-                  <div key={i} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    backgroundColor: '#131d2e',
-                  }}>
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      backgroundColor: '#131d2e',
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <ClubBadge club={injury.team} size="sm" />
                       <span style={{ fontSize: '14px', color: '#e8edf5' }}>{injury.player}</span>
@@ -210,10 +317,7 @@ export function MatchPrep() {
             </div>
           </div>
 
-          {/* Right column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-            {/* Key Talking Points */}
             <div style={card}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#e8edf5', marginBottom: '14px' }}>
                 Key Talking Points
@@ -228,13 +332,15 @@ export function MatchPrep() {
               </div>
             </div>
 
-            {/* Recent Context */}
             <div style={card}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#e8edf5', marginBottom: '16px' }}>
                 Recent Context
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {[{ club: 'Chelsea', form: chelseaForm }, { club: 'Arsenal', form: arsenalForm }].map(({ club, form }) => (
+                {[
+                  { club: match.home, form: homeForm },
+                  { club: match.away, form: awayForm },
+                ].map(({ club, form }) => (
                   <div key={club}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                       <ClubBadge club={club} size="sm" />
@@ -244,18 +350,21 @@ export function MatchPrep() {
                       {form.map((result, i) => {
                         const c = resultColor(result);
                         return (
-                          <div key={i} style={{
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            backgroundColor: c.bg,
-                            color: c.text,
-                          }}>
+                          <div
+                            key={i}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              backgroundColor: c.bg,
+                              color: c.text,
+                            }}
+                          >
                             {result}
                           </div>
                         );
@@ -266,26 +375,27 @@ export function MatchPrep() {
               </div>
             </div>
 
-            {/* Sources */}
             <div style={card}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#e8edf5', marginBottom: '14px' }}>
                 Sources
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {sources.map((source, i) => (
-                  <div key={i} style={{
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: '#131d2e',
-                    border: '1px solid rgba(255,255,255,0.04)',
-                  }}>
+                  <div
+                    key={i}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: '#131d2e',
+                      border: '1px solid rgba(255,255,255,0.04)',
+                    }}
+                  >
                     <div style={{ fontSize: '13px', color: '#c8d8f0', marginBottom: '2px' }}>{source.title}</div>
                     <div style={{ fontSize: '11.5px', color: '#4a5568' }}>{source.domain}</div>
                   </div>
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       </div>
