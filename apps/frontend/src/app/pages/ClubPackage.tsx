@@ -272,15 +272,20 @@ export function ClubPackage() {
     }
   });
 
-  const resetLoanMonitorState = useEffectEvent(() => {
-    clearLoanMonitorPoll();
+  const resetLoanMonitorState = () => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
     setLoanMonitorRunId(null);
     setLoanMonitorError(null);
     setLoanMonitorPlayers(null);
     setLoanMonitorStatus('idle');
-    clearStoredLoanMonitorRunId();
-    clearStoredLoanMonitorResult();
-  });
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY);
+      window.sessionStorage.removeItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+    }
+  };
 
   const pollLoanMonitor = useEffectEvent(async (nextRunId?: string) => {
     clearLoanMonitorPoll();
