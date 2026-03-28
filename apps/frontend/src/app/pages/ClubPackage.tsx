@@ -72,6 +72,8 @@ type LoanMonitorResponse =
   | LoanMonitorPendingResponse
   | LoanMonitorFailedResponse;
 
+const LOAN_MONITOR_RUN_ID_STORAGE_KEY = 'onside.loan-monitor.run-id';
+
 const clubs = ['Chelsea', 'Manchester United', 'Arsenal', 'Liverpool'];
 
 const clubData: Record<string, ClubInfo> = {
@@ -221,6 +223,12 @@ export function ClubPackage() {
     }
   });
 
+  const clearStoredLoanMonitorRunId = useEffectEvent(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY);
+    }
+  });
+
   const pollLoanMonitor = useEffectEvent(async (nextRunId?: string) => {
     clearLoanMonitorPoll();
     setLoanMonitorStatus(nextRunId ? 'polling' : 'loading');
@@ -233,6 +241,9 @@ export function ClubPackage() {
         setLoanMonitorRunId(payload.runId);
         setLoanMonitorError(null);
         setLoanMonitorStatus('polling');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY, payload.runId);
+        }
 
         pollTimeoutRef.current = setTimeout(() => {
           void pollLoanMonitor(payload.runId);
@@ -245,6 +256,7 @@ export function ClubPackage() {
         setLoanMonitorRunId(null);
         setLoanMonitorStatus('error');
         setLoanMonitorError(payload.error.message);
+        clearStoredLoanMonitorRunId();
         return;
       }
 
@@ -252,10 +264,12 @@ export function ClubPackage() {
       setLoanMonitorError(null);
       setLoanMonitorPlayers(mapLoanMonitorPlayers(payload.data.players));
       setLoanMonitorStatus('success');
+      clearStoredLoanMonitorRunId();
     } catch (error) {
       setLoanMonitorRunId(null);
       setLoanMonitorStatus('error');
       setLoanMonitorError(error instanceof Error ? error.message : 'Failed to load loan monitor');
+      clearStoredLoanMonitorRunId();
     }
   });
 
@@ -266,15 +280,22 @@ export function ClubPackage() {
       setLoanMonitorError(null);
       setLoanMonitorPlayers(null);
       setLoanMonitorStatus('idle');
+      clearStoredLoanMonitorRunId();
       return;
     }
 
-    void pollLoanMonitor();
+    const storedRunId =
+      typeof window !== 'undefined'
+        ? window.sessionStorage.getItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY)
+        : null;
+
+    setLoanMonitorRunId(storedRunId);
+    void pollLoanMonitor(storedRunId ?? undefined);
 
     return () => {
       clearLoanMonitorPoll();
     };
-  }, [clearLoanMonitorPoll, pollLoanMonitor, selectedClub]);
+  }, [clearLoanMonitorPoll, clearStoredLoanMonitorRunId, pollLoanMonitor, selectedClub]);
 
   const baseClub = clubData[selectedClub] ?? clubData['Chelsea'];
   const current =

@@ -7,6 +7,8 @@ import {
   TinyFishUpstreamError,
 } from "@/lib/tinyfish";
 
+let activeLoanMonitorRunId: string | null = null;
+
 const mockPlayers = [
   {
     id: "jimmy-jay-morgan",
@@ -61,7 +63,25 @@ export async function GET(request: NextRequest) {
 
   try {
     if (!runId) {
+      if (activeLoanMonitorRunId) {
+        return Response.json(
+          {
+            success: false,
+            status: "pending",
+            runId: activeLoanMonitorRunId,
+            meta: {
+              source: "tinyfish",
+              generatedAt: new Date().toISOString(),
+            },
+          },
+          {
+            status: 202,
+          },
+        );
+      }
+
       const started = await startLiveLoanMonitorRun();
+      activeLoanMonitorRunId = started.runId;
 
       return Response.json(
         {
@@ -82,6 +102,8 @@ export async function GET(request: NextRequest) {
     const result = await getLiveLoanMonitorRunStatus(runId);
 
     if (result.kind === "pending") {
+      activeLoanMonitorRunId = result.runId;
+
       return Response.json(
         {
           success: false,
@@ -97,6 +119,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (result.kind === "failure") {
+      if (activeLoanMonitorRunId === result.runId) {
+        activeLoanMonitorRunId = null;
+      }
+
       return Response.json(
         {
           success: false,
@@ -115,6 +141,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (activeLoanMonitorRunId === result.runId) {
+      activeLoanMonitorRunId = null;
+    }
+
     return Response.json({
       success: true,
       data: {
@@ -127,6 +157,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (runId && activeLoanMonitorRunId === runId) {
+      activeLoanMonitorRunId = null;
+    }
+
     if (error instanceof TinyFishUpstreamError) {
       return Response.json(
         {
