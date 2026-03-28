@@ -75,6 +75,32 @@ type LoanMonitorResponse =
 const LOAN_MONITOR_RUN_ID_STORAGE_KEY = 'onside.loan-monitor.run-id';
 const LOAN_MONITOR_RESULT_STORAGE_KEY = 'onside.loan-monitor.result';
 
+function readStoredLoanMonitorPlayers(): ClubPlayer[] | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const storedPlayers = window.sessionStorage.getItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+  if (!storedPlayers) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedPlayers) as ClubPlayer[];
+  } catch {
+    window.sessionStorage.removeItem(LOAN_MONITOR_RESULT_STORAGE_KEY);
+    return null;
+  }
+}
+
+function readStoredLoanMonitorRunId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.sessionStorage.getItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY);
+}
+
 const clubs = ['Chelsea', 'Manchester United', 'Arsenal', 'Liverpool'];
 
 const clubData: Record<string, ClubInfo> = {
@@ -211,10 +237,20 @@ function MetricCard({ label, value, color, icon }: { label: string; value: numbe
 
 export function ClubPackage() {
   const [selectedClub, setSelectedClub] = useState('Chelsea');
-  const [loanMonitorRunId, setLoanMonitorRunId] = useState<string | null>(null);
-  const [loanMonitorStatus, setLoanMonitorStatus] = useState<'idle' | 'loading' | 'polling' | 'success' | 'error'>('idle');
+  const [loanMonitorPlayers, setLoanMonitorPlayers] = useState<ClubPlayer[] | null>(() => readStoredLoanMonitorPlayers());
+  const [loanMonitorRunId, setLoanMonitorRunId] = useState<string | null>(() => readStoredLoanMonitorRunId());
+  const [loanMonitorStatus, setLoanMonitorStatus] = useState<'idle' | 'loading' | 'polling' | 'success' | 'error'>(() => {
+    if (readStoredLoanMonitorPlayers()) {
+      return 'success';
+    }
+
+    if (readStoredLoanMonitorRunId()) {
+      return 'polling';
+    }
+
+    return 'idle';
+  });
   const [loanMonitorError, setLoanMonitorError] = useState<string | null>(null);
-  const [loanMonitorPlayers, setLoanMonitorPlayers] = useState<ClubPlayer[] | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearLoanMonitorPoll = useEffectEvent(() => {
@@ -297,37 +333,16 @@ export function ClubPackage() {
       return;
     }
 
-    const storedPlayers =
-      typeof window !== 'undefined'
-        ? window.sessionStorage.getItem(LOAN_MONITOR_RESULT_STORAGE_KEY)
-        : null;
-
-    if (storedPlayers) {
-      try {
-        const parsedPlayers = JSON.parse(storedPlayers) as ClubPlayer[];
-        setLoanMonitorPlayers(parsedPlayers);
-        setLoanMonitorRunId(null);
-        setLoanMonitorError(null);
-        setLoanMonitorStatus('success');
-        clearStoredLoanMonitorRunId();
-        return;
-      } catch {
-        clearStoredLoanMonitorResult();
-      }
+    if (loanMonitorPlayers) {
+      return;
     }
 
-    const storedRunId =
-      typeof window !== 'undefined'
-        ? window.sessionStorage.getItem(LOAN_MONITOR_RUN_ID_STORAGE_KEY)
-        : null;
-
-    setLoanMonitorRunId(storedRunId);
-    void pollLoanMonitor(storedRunId ?? undefined);
+    void pollLoanMonitor(loanMonitorRunId ?? undefined);
 
     return () => {
       clearLoanMonitorPoll();
     };
-  }, [selectedClub]);
+  }, [loanMonitorPlayers, loanMonitorRunId, selectedClub]);
 
   useEffect(() => {
     if (selectedClub !== 'Chelsea' || loanMonitorStatus !== 'polling' || !loanMonitorRunId) {
