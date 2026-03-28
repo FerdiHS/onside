@@ -1,5 +1,11 @@
-import { createFailureResponse, createMeta, failureStatusCode } from "@/lib/schemas";
-import { getLiveLoanMonitor, isTinyFishConfigured, TinyFishUpstreamError } from "@/lib/tinyfish";
+import type { NextRequest } from "next/server";
+
+import {
+  getLiveLoanMonitorRunStatus,
+  isTinyFishConfigured,
+  startLiveLoanMonitorRun,
+  TinyFishUpstreamError,
+} from "@/lib/tinyfish";
 
 const mockPlayers = [
   {
@@ -36,7 +42,9 @@ const mockPlayers = [
   },
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const runId = request.nextUrl.searchParams.get("runId")?.trim();
+
   if (!isTinyFishConfigured()) {
     return Response.json({
       success: true,
@@ -52,19 +60,59 @@ export async function GET() {
   }
 
   try {
-    const result = await getLiveLoanMonitor();
+    if (!runId) {
+      const started = await startLiveLoanMonitorRun();
+
+      return Response.json(
+        {
+          success: false,
+          status: "pending",
+          runId: started.runId,
+          meta: {
+            source: "tinyfish",
+            generatedAt: new Date().toISOString(),
+          },
+        },
+        {
+          status: 202,
+        },
+      );
+    }
+
+    const result = await getLiveLoanMonitorRunStatus(runId);
+
+    if (result.kind === "pending") {
+      return Response.json(
+        {
+          success: false,
+          status: "pending",
+          runId: result.runId,
+          meta: {
+            source: "tinyfish",
+            generatedAt: new Date().toISOString(),
+          },
+        },
+        { status: 202 },
+      );
+    }
 
     if (result.kind === "failure") {
-      const failure = createFailureResponse(
-        result.code,
-        result.message,
-        createMeta("live", "partial"),
-        result.details,
+      return Response.json(
+        {
+          success: false,
+          status: "failed",
+          error: {
+            code: "TINYFISH_FAILED",
+            message: result.message,
+            ...(result.details ? { details: result.details } : {}),
+          },
+          meta: {
+            source: "tinyfish",
+            generatedAt: new Date().toISOString(),
+          },
+        },
+        { status: 502 },
       );
-
-      return Response.json(failure, {
-        status: failureStatusCode(failure.error.code),
-      });
     }
 
     return Response.json({
@@ -80,26 +128,38 @@ export async function GET() {
     });
   } catch (error) {
     if (error instanceof TinyFishUpstreamError) {
-      const failure = createFailureResponse(
-        "UPSTREAM_FAILURE",
-        error.message,
-        createMeta("live", "partial"),
-        error.details,
+      return Response.json(
+        {
+          success: false,
+          status: "failed",
+          error: {
+            code: "TINYFISH_FAILED",
+            message: error.message,
+            ...(error.details ? { details: error.details } : {}),
+          },
+          meta: {
+            source: "tinyfish",
+            generatedAt: new Date().toISOString(),
+          },
+        },
+        { status: 502 },
       );
-
-      return Response.json(failure, {
-        status: failureStatusCode(failure.error.code),
-      });
     }
 
-    const failure = createFailureResponse(
-      "INTERNAL_ERROR",
-      "Failed to load loan monitor data.",
-      createMeta("live", "partial"),
+    return Response.json(
+      {
+        success: false,
+        status: "failed",
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to load loan monitor data.",
+        },
+        meta: {
+          source: "tinyfish",
+          generatedAt: new Date().toISOString(),
+        },
+      },
+      { status: 500 },
     );
-
-    return Response.json(failure, {
-      status: failureStatusCode(failure.error.code),
-    });
   }
 }
