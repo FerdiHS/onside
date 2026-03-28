@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+
 import type { MatchPrepScenario } from "@/lib/mock-data";
 import { buildMatchPrepGoal } from "@/lib/prompts";
 import {
@@ -84,6 +86,32 @@ type LiveMatchPrepResult =
       details?: Record<string, unknown>;
     };
 
+type LiveLoanMonitorResult =
+  | {
+      kind: "success";
+      players: LoanMonitorPlayer[];
+    }
+  | {
+      kind: "failure";
+      code: FailureCode;
+      message: string;
+      details?: Record<string, unknown>;
+    };
+
+export type LoanMonitorPlayer = {
+  id: string;
+  name: string;
+  loanClub: string;
+  position: string;
+  performance: {
+    appearances: number;
+    goals: number;
+    assists: number;
+  };
+  developmentNotes: string[];
+  status: "rising" | "stable" | "concern";
+};
+
 export type LiveMatchPrepRunPollResult =
   | {
       kind: "pending";
@@ -117,6 +145,24 @@ const RUN_ASYNC_ENDPOINT_PATH = "/v1/automation/run-async";
 const RUNS_ENDPOINT_PATH = "/v1/runs";
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
 
+const LoanMonitorPlayerSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  loanClub: z.string().min(1),
+  position: z.string().min(1),
+  performance: z.object({
+    appearances: z.number().int().nonnegative(),
+    goals: z.number().int().nonnegative(),
+    assists: z.number().int().nonnegative(),
+  }),
+  developmentNotes: z.array(z.string()),
+  status: z.enum(["rising", "stable", "concern"]),
+});
+
+const LoanMonitorPayloadSchema = z.object({
+  players: z.array(LoanMonitorPlayerSchema),
+});
+
 export async function getLiveMatchPrep(
   scenario: MatchPrepScenario,
   detail: MatchPrepDetail = "full",
@@ -127,6 +173,24 @@ export async function getLiveMatchPrep(
     unwrapTinyFishResult(response),
     getScenarioSeed(scenario),
     detail,
+    getRunDetails(response),
+  );
+}
+
+export async function getLiveLoanMonitor(): Promise<LiveLoanMonitorResult> {
+  const response = await runTinyFishAutomation({
+    url: "https://www.premierleague.com",
+    goal: [
+      "Return strict JSON only.",
+      "Provide exactly 2 football loan players.",
+      'Use this shape: {"players":[{"id":"string","name":"string","loanClub":"string","position":"string","performance":{"appearances":0,"goals":0,"assists":0},"developmentNotes":["string"],"status":"rising|stable|concern"}]}',
+      "Do not include markdown or extra commentary.",
+    ].join(" "),
+    api_integration: "onside",
+  });
+
+  return interpretTinyFishLoanMonitorPayload(
+    unwrapTinyFishResult(response),
     getRunDetails(response),
   );
 }
@@ -468,6 +532,48 @@ function interpretTinyFishMatchPrepPayload(
     kind: "success",
     data: normalized.data,
     completeness: normalized.completeness,
+  };
+}
+
+function interpretTinyFishLoanMonitorPayload(
+  result: unknown,
+  details?: Record<string, unknown>,
+): LiveLoanMonitorResult {
+  const structuredResult = coerceStructuredValue(result);
+
+  if (isGoalFailureEnvelope(structuredResult)) {
+    return {
+      kind: "failure",
+      code: "UPSTREAM_FAILURE",
+      message:
+        structuredResult.error_message ??
+        "TinyFish could not complete live loan-monitor extraction.",
+      details: {
+        ...(details ?? {}),
+        error_type: structuredResult.error_type ?? "goal_failed",
+      },
+    };
+  }
+
+  const payload = unwrapGoalSuccessPayload(structuredResult);
+  const parsed = LoanMonitorPayloadSchema.safeParse(payload);
+
+  if (!parsed.success) {
+    return {
+      kind: "failure",
+      code: "VALIDATION_ERROR",
+      message:
+        "TinyFish completed, but the structured payload did not contain usable loan-monitor fields.",
+      details: {
+        ...(details ?? {}),
+        issues: parsed.error.issues,
+      },
+    };
+  }
+
+  return {
+    kind: "success",
+    players: parsed.data.players,
   };
 }
 

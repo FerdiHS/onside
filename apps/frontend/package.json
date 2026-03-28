@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,6 +13,7 @@
     "prepare": "cd ../.. && ./apps/frontend/node_modules/.bin/husky .husky"
   },
   "dependencies": {
+    "lucide-react": "^1.7.0",
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -23,11 +24,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.27",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
+    "postcss": "^8.5.8",
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "typescript": "^5"
