@@ -157,7 +157,9 @@ It is used to perform live web extraction and turn football web pages into struc
 - partial data should be handled gracefully
 
 ### Current Match Prep implementation
+
 The current Match Prep foundation supports:
+
 - `GET /api/fixtures` for the mock upcoming future-match selector
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
@@ -165,6 +167,7 @@ The current Match Prep foundation supports:
 - pending polling responses include `next_poll_after_ms` and a `Retry-After` header so the frontend can poll predictably
 
 The current live Match Prep source strategy uses a curated football source pack:
+
 - Sofascore as the primary source
 - OneFootball, GOAL, B/R Football, and 433 as supporting sources
 
@@ -172,10 +175,12 @@ Completed Match Prep results are cached in memory per dev-server instance for fa
 Cached responses that originated from the direct sync route may not include a `run_id`, because no async TinyFish run handle exists for them.
 
 The `detail` level is important for UX:
+
 - `detail=summary` asks TinyFish for a lighter, faster summary-focused payload
 - `detail=full` asks TinyFish for the richer Match Prep payload, including lineups and absences when available
 
 Both detail levels keep the same JSON shape. In summary mode, lineup and absence fields may intentionally be empty arrays.
+When `OPENAI_API_KEY` is configured, live `detail=summary` responses may also include an additive `display` layer with AI-assisted projected lineups or summary text for missing fields while preserving the TinyFish root fields as the source-backed core.
 
 ---
 
@@ -197,6 +202,7 @@ It is intended for tasks such as:
 - OpenAI must be called **server-side only**
 - `OPENAI_API_KEY` must never be exposed to the client
 - OpenAI should synthesize from structured inputs, not replace source-backed fields
+- AI-assisted Match Prep fallback should live in additive display fields, not overwrite the root TinyFish payload
 - if synthesis fails, the app should still render usable structured data
 - the output should stay concise, factual, and dashboard-friendly
 
@@ -261,26 +267,34 @@ Planned structure:
 
 ## Environment Variables
 
-Create a local `.env.local` file.
+Create a local `apps/frontend/.env.local` file.
+Start by copying `apps/frontend/.env.example`.
 
 Example:
 
 ```bash
+cp apps/frontend/.env.example apps/frontend/.env.local
+
 TINYFISH_API_KEY=
 OPENAI_API_KEY=
 LIVE_TINYFISH=false
 TINYFISH_TIMEOUT_MS=300000
 TINYFISH_BROWSER_PROFILE=lite
+TINYFISH_PROXY_COUNTRY=
+MATCH_PREP_POLL_INTERVAL_MS=2000
+NEXT_PUBLIC_MATCH_PREP_MODE=mock
 NEXT_PUBLIC_APP_NAME=Onside
 ```
 
 Notes:
 
 - `TINYFISH_API_KEY` is required for live TinyFish mode
-- `OPENAI_API_KEY` is required for server-side synthesis features
+- `OPENAI_API_KEY` is required for server-side synthesis features, including the summary-mode Match Prep fallback display
 - `TINYFISH_TIMEOUT_MS` controls how long the server waits for TinyFish sync calls before timing out
 - `TINYFISH_BROWSER_PROFILE` can be `lite` or `stealth`
 - `TINYFISH_PROXY_COUNTRY` is optional if geographic proxy routing is needed
+- `MATCH_PREP_POLL_INTERVAL_MS` overrides the recommended async Match Prep polling interval
+- `NEXT_PUBLIC_MATCH_PREP_MODE` controls whether the frontend defaults Match Prep requests to `mock` or `live`
 - keep secrets server-side only
 - do not commit `.env.local`
 
@@ -319,6 +333,7 @@ curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-
 ```
 
 Notes:
+
 - use `start` plus `status` with `detail=summary` for the best live UX on slow TinyFish runs
 - use `detail=full` only when you need the richer lineup and absence pass
 - the direct `mode=live` route still works, but it waits for the live extraction unless a cached result already exists
@@ -337,6 +352,7 @@ npm run build
 This repository uses Conventional Commits so Release Please can generate changelogs and release PRs consistently.
 
 Recommended prefixes:
+
 - `feat:` for user-facing features (minor release)
 - `fix:` for bug fixes (patch release)
 - `docs:` for documentation-only changes

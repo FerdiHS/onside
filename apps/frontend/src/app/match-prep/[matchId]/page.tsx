@@ -1,9 +1,10 @@
 import MatchPrep from '../../pages/MatchPrep';
 
-export default function Page({
+export default async function Page({
   params,
 }: {
-  params: { matchId: string };
+  params: Promise<{ matchId: string }>;
 }) {
-  return <MatchPrep params={params} />;
+  const resolvedParams = await params;
+  return <MatchPrep key={resolvedParams.matchId} params={resolvedParams} />;
 }

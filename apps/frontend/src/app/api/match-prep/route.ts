@@ -17,6 +17,7 @@ import {
   isDataMode,
   isMatchPrepDetail,
 } from "@/lib/schemas";
+import { ensureLiveSummaryMatchPrepDisplay } from "@/lib/openai";
 import { getLiveMatchPrep } from "@/lib/tinyfish";
 
 export const runtime = "nodejs";
@@ -90,9 +91,24 @@ export async function GET(request: NextRequest) {
 
   const cached = getCachedMatchPrepResult(matchId, detail);
   if (cached) {
+    const cachedData =
+      detail === "summary"
+        ? await ensureLiveSummaryMatchPrepDisplay(cached.data)
+        : cached.data;
+
+    if (cachedData !== cached.data) {
+      setCachedMatchPrepResult({
+        matchId,
+        detail,
+        runId: cached.runId,
+        data: cachedData,
+        completeness: cached.completeness,
+      });
+    }
+
     return Response.json({
       success: true,
-      data: cached.data,
+      data: cachedData,
       meta: createMeta("live", cached.completeness, {
         progress_supported: true,
         detail,
@@ -116,17 +132,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const data =
+      detail === "summary"
+        ? await ensureLiveSummaryMatchPrepDisplay(result.data)
+        : result.data;
+
     setCachedMatchPrepResult({
       matchId,
       detail,
       runId: null,
-      data: result.data,
+      data,
       completeness: result.completeness,
     });
 
     return Response.json({
       success: true,
-      data: result.data,
+      data,
       meta: createMeta("live", result.completeness, {
         progress_supported: true,
         detail,

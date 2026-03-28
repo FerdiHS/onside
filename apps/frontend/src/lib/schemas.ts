@@ -33,6 +33,33 @@ export type SourceLink = {
   domain?: string | null;
 };
 
+export type MatchPrepDisplayProvenance =
+  | "source-backed"
+  | "ai-assisted"
+  | "mixed";
+
+export type MatchPrepDisplayConfidence = "low" | "medium" | "high";
+
+export type MatchPrepDisplayList = {
+  items: string[];
+  provenance: MatchPrepDisplayProvenance;
+  note?: string;
+  confidence?: MatchPrepDisplayConfidence;
+};
+
+export type MatchPrepDisplayData = {
+  probable_lineups: {
+    home: MatchPrepDisplayList;
+    away: MatchPrepDisplayList;
+  };
+  injuries_or_absences: {
+    home: MatchPrepDisplayList;
+    away: MatchPrepDisplayList;
+  };
+  recent_context: MatchPrepDisplayList;
+  key_talking_points: MatchPrepDisplayList;
+};
+
 export type MatchSummary = {
   id: string;
   competition: string | null;
@@ -66,6 +93,7 @@ export type MatchPrepData = {
   recent_context: string[];
   key_talking_points: string[];
   sources: SourceLink[];
+  display?: MatchPrepDisplayData;
 };
 
 export type MatchPrepResponse = {
@@ -311,6 +339,39 @@ export function hasMeaningfulMatchPrepSignals(data: MatchPrepData): boolean {
   );
 }
 
+export function createMatchPrepDisplayList(
+  items: string[],
+  provenance: MatchPrepDisplayProvenance = "source-backed",
+  extra?: {
+    note?: string;
+    confidence?: MatchPrepDisplayConfidence;
+  },
+): MatchPrepDisplayList {
+  return {
+    items: sanitizeDisplayItems(items),
+    provenance,
+    ...(extra?.note ? { note: extra.note } : {}),
+    ...(extra?.confidence ? { confidence: extra.confidence } : {}),
+  };
+}
+
+export function createSourceBackedMatchPrepDisplay(
+  data: MatchPrepData,
+): MatchPrepDisplayData {
+  return {
+    probable_lineups: {
+      home: createMatchPrepDisplayList(data.probable_lineups.home),
+      away: createMatchPrepDisplayList(data.probable_lineups.away),
+    },
+    injuries_or_absences: {
+      home: createMatchPrepDisplayList(data.injuries_or_absences.home),
+      away: createMatchPrepDisplayList(data.injuries_or_absences.away),
+    },
+    recent_context: createMatchPrepDisplayList(data.recent_context),
+    key_talking_points: createMatchPrepDisplayList(data.key_talking_points),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -357,6 +418,10 @@ function readStringArray(value: unknown): StringArrayResult {
       .filter((item) => item.length > 0),
     missing: false,
   };
+}
+
+function sanitizeDisplayItems(items: string[]): string[] {
+  return [...new Set(items.map((item) => item.trim()).filter((item) => item.length > 0))];
 }
 
 function readSourceLinkArray(value: unknown): SourceLinkArrayResult {

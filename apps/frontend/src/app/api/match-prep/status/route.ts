@@ -24,6 +24,7 @@ import {
   type MatchPrepDetail,
   type MatchPrepRunResponse,
 } from "@/lib/schemas";
+import { ensureLiveSummaryMatchPrepDisplay } from "@/lib/openai";
 import { getLiveMatchPrepRunStatus } from "@/lib/tinyfish";
 
 export const runtime = "nodejs";
@@ -114,6 +115,21 @@ export async function GET(request: NextRequest) {
 
   const cached = getCachedMatchPrepResult(matchId, detail);
   if (cached) {
+    const cachedData =
+      detail === "summary"
+        ? await ensureLiveSummaryMatchPrepDisplay(cached.data)
+        : cached.data;
+
+    if (cachedData !== cached.data) {
+      setCachedMatchPrepResult({
+        matchId,
+        detail,
+        runId: cached.runId,
+        data: cachedData,
+        completeness: cached.completeness,
+      });
+    }
+
     return Response.json({
       success: true,
       data: {
@@ -122,7 +138,7 @@ export async function GET(request: NextRequest) {
         cached: true,
         poll_url: buildStatusUrl(matchId, detail),
         result_url: buildResultUrl(matchId, detail),
-        result: cached.data,
+        result: cachedData,
         ...(cached.runId ? { run_id: cached.runId } : {}),
       },
       meta: createMeta("live", cached.completeness, {
@@ -192,11 +208,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (polled.kind === "success") {
+      const data =
+        detail === "summary"
+          ? await ensureLiveSummaryMatchPrepDisplay(polled.data)
+          : polled.data;
+
       setCachedMatchPrepResult({
         matchId,
         detail,
         runId,
-        data: polled.data,
+        data,
         completeness: polled.completeness,
       });
 
@@ -210,7 +231,7 @@ export async function GET(request: NextRequest) {
           poll_url: buildStatusUrl(matchId, detail),
           result_url: buildResultUrl(matchId, detail),
           streaming_url: polled.streamingUrl,
-          result: polled.data,
+          result: data,
         },
         meta: createMeta("live", polled.completeness, {
           progress_supported: true,
