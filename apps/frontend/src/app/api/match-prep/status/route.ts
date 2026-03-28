@@ -7,19 +7,22 @@ import {
   getCachedMatchPrepResult,
   getKnownMatchPrepRequestForRunId,
   registerActiveMatchPrepRun,
-  setCachedMatchPrepResult,
   updateActiveMatchPrepRun,
 } from "@/lib/match-prep-jobs";
 import {
+  getMatchPrepPollIntervalMs,
   mapMatchPrepRuntimeError,
+  retryAfterSeconds,
   resolveMatchPrepDetail,
 } from "@/lib/match-prep-runtime";
+import { cacheFinalLiveMatchPrepResult, finalizeLiveMatchPrepData } from "@/lib/match-prep-live";
 import {
   createFailureResponse,
   createMeta,
   failureStatusCode,
   isMatchPrepDetail,
   type MatchPrepDetail,
+  type MatchPrepRunResponse,
 } from "@/lib/schemas";
 import { getLiveMatchPrepRunStatus } from "@/lib/tinyfish";
 
@@ -111,16 +114,28 @@ export async function GET(request: NextRequest) {
 
   const cached = getCachedMatchPrepResult(matchId, detail);
   if (cached) {
+    const cachedData = await finalizeLiveMatchPrepData(cached.data, detail);
+
+    if (cachedData !== cached.data) {
+      await cacheFinalLiveMatchPrepResult({
+        matchId,
+        detail,
+        runId: cached.runId,
+        data: cachedData,
+        completeness: cached.completeness,
+      });
+    }
+
     return Response.json({
       success: true,
       data: {
         match_id: matchId,
-        run_id: cached.runId,
         status: "completed",
         cached: true,
         poll_url: buildStatusUrl(matchId, detail),
         result_url: buildResultUrl(matchId, detail),
-        result: cached.data,
+        result: cachedData,
+        ...(cached.runId ? { run_id: cached.runId } : {}),
       },
       meta: createMeta("live", cached.completeness, {
         progress_supported: true,
@@ -163,7 +178,10 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      return Response.json({
+      const nextPollAfterMs = getMatchPrepPollIntervalMs(
+        toClientPendingStatus(polled.status),
+      );
+      const response: MatchPrepRunResponse = {
         success: true,
         data: {
           match_id: matchId,
@@ -173,13 +191,20 @@ export async function GET(request: NextRequest) {
           poll_url: buildStatusUrl(matchId, detail),
           result_url: buildResultUrl(matchId, detail),
           streaming_url: polled.streamingUrl,
+          next_poll_after_ms: nextPollAfterMs,
         },
         meta: createMeta("live", "partial", { progress_supported: true, detail }),
+      };
+
+      return Response.json(response, {
+        headers: {
+          "Retry-After": retryAfterSeconds(nextPollAfterMs),
+        },
       });
     }
 
     if (polled.kind === "success") {
-      setCachedMatchPrepResult({
+      const data = await cacheFinalLiveMatchPrepResult({
         matchId,
         detail,
         runId,
@@ -187,7 +212,7 @@ export async function GET(request: NextRequest) {
         completeness: polled.completeness,
       });
 
-      return Response.json({
+      const response: MatchPrepRunResponse = {
         success: true,
         data: {
           match_id: matchId,
@@ -197,18 +222,20 @@ export async function GET(request: NextRequest) {
           poll_url: buildStatusUrl(matchId, detail),
           result_url: buildResultUrl(matchId, detail),
           streaming_url: polled.streamingUrl,
-          result: polled.data,
+          result: data,
         },
         meta: createMeta("live", polled.completeness, {
           progress_supported: true,
           detail,
         }),
-      });
+      };
+
+      return Response.json(response);
     }
 
     clearActiveMatchPrepRun(runId);
 
-    return Response.json({
+    const response: MatchPrepRunResponse = {
       success: true,
       data: {
         match_id: matchId,
@@ -225,7 +252,9 @@ export async function GET(request: NextRequest) {
         },
       },
       meta: createMeta("live", "partial", { progress_supported: true, detail }),
-    });
+    };
+
+    return Response.json(response);
   } catch (error) {
     const failure = mapMatchPrepRuntimeError(error, detail);
 

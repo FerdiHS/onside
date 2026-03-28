@@ -4,12 +4,13 @@ import {
   createMockMatchPrepResponse,
   getMatchPrepScenario,
 } from "@/lib/mock-data";
-import { getCachedMatchPrepResult, setCachedMatchPrepResult } from "@/lib/match-prep-jobs";
+import { getCachedMatchPrepResult } from "@/lib/match-prep-jobs";
 import {
   resolveMatchPrepDetail,
   mapMatchPrepRuntimeError,
   resolveMatchPrepMode,
 } from "@/lib/match-prep-runtime";
+import { cacheFinalLiveMatchPrepResult, finalizeLiveMatchPrepData } from "@/lib/match-prep-live";
 import {
   createFailureResponse,
   createMeta,
@@ -90,9 +91,21 @@ export async function GET(request: NextRequest) {
 
   const cached = getCachedMatchPrepResult(matchId, detail);
   if (cached) {
+    const cachedData = await finalizeLiveMatchPrepData(cached.data, detail);
+
+    if (cachedData !== cached.data) {
+      await cacheFinalLiveMatchPrepResult({
+        matchId,
+        detail,
+        runId: cached.runId,
+        data: cachedData,
+        completeness: cached.completeness,
+      });
+    }
+
     return Response.json({
       success: true,
-      data: cached.data,
+      data: cachedData,
       meta: createMeta("live", cached.completeness, {
         progress_supported: true,
         detail,
@@ -116,7 +129,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    setCachedMatchPrepResult({
+    const data = await cacheFinalLiveMatchPrepResult({
       matchId,
       detail,
       runId: null,
@@ -126,7 +139,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: result.data,
+      data,
       meta: createMeta("live", result.completeness, {
         progress_supported: true,
         detail,

@@ -164,6 +164,8 @@ The current Match Prep foundation supports:
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
+- `GET /api/match-prep/stream?matchId=<id>&detail=summary` for TinyFish live research streaming
+- pending polling responses include `next_poll_after_ms` and a `Retry-After` header so the frontend can poll predictably
 
 The current live Match Prep source strategy uses a curated football source pack:
 
@@ -171,6 +173,7 @@ The current live Match Prep source strategy uses a curated football source pack:
 - OneFootball, GOAL, B/R Football, and 433 as supporting sources
 
 Completed Match Prep results are cached in memory per dev-server instance for faster follow-up reads.
+Cached responses that originated from the direct sync route may not include a `run_id`, because no async TinyFish run handle exists for them.
 
 The `detail` level is important for UX:
 
@@ -178,6 +181,8 @@ The `detail` level is important for UX:
 - `detail=full` asks TinyFish for the richer Match Prep payload, including lineups and absences when available
 
 Both detail levels keep the same JSON shape. In summary mode, lineup and absence fields may intentionally be empty arrays.
+When `OPENAI_API_KEY` is configured, live `detail=summary` responses may also include an additive `display` layer with AI-assisted projected lineups or summary text for missing fields while preserving the TinyFish root fields as the source-backed core.
+When `NEXT_PUBLIC_MATCH_PREP_MODE=live`, the frontend now prefers the TinyFish live research stream first, showing a curated activity feed plus browser preview when available, and falls back to `start` plus `status` polling if streaming is unavailable or disconnects.
 
 ---
 
@@ -199,6 +204,7 @@ It is intended for tasks such as:
 - OpenAI must be called **server-side only**
 - `OPENAI_API_KEY` must never be exposed to the client
 - OpenAI should synthesize from structured inputs, not replace source-backed fields
+- AI-assisted Match Prep fallback should live in additive display fields, not overwrite the root TinyFish payload
 - if synthesis fails, the app should still render usable structured data
 - the output should stay concise, factual, and dashboard-friendly
 
@@ -263,26 +269,34 @@ Planned structure:
 
 ## Environment Variables
 
-Create a local `.env.local` file.
+Create a local `apps/frontend/.env.local` file.
+Start by copying `apps/frontend/.env.example`.
 
 Example:
 
 ```bash
+cp apps/frontend/.env.example apps/frontend/.env.local
+
 TINYFISH_API_KEY=
 OPENAI_API_KEY=
 LIVE_TINYFISH=false
 TINYFISH_TIMEOUT_MS=300000
 TINYFISH_BROWSER_PROFILE=lite
+TINYFISH_PROXY_COUNTRY=
+MATCH_PREP_POLL_INTERVAL_MS=2000
+NEXT_PUBLIC_MATCH_PREP_MODE=mock
 NEXT_PUBLIC_APP_NAME=Onside
 ```
 
 Notes:
 
 - `TINYFISH_API_KEY` is required for live TinyFish mode
-- `OPENAI_API_KEY` is required for server-side synthesis features
+- `OPENAI_API_KEY` is required for server-side synthesis features, including the summary-mode Match Prep fallback display
 - `TINYFISH_TIMEOUT_MS` controls how long the server waits for TinyFish sync calls before timing out
 - `TINYFISH_BROWSER_PROFILE` can be `lite` or `stealth`
 - `TINYFISH_PROXY_COUNTRY` is optional if geographic proxy routing is needed
+- `MATCH_PREP_POLL_INTERVAL_MS` overrides the recommended async Match Prep polling interval
+- `NEXT_PUBLIC_MATCH_PREP_MODE` controls whether the frontend defaults Match Prep requests to `mock` or `live`
 - keep secrets server-side only
 - do not commit `.env.local`
 
@@ -315,6 +329,8 @@ curl -X POST "http://localhost:3000/api/match-prep/start" \
 
 curl "http://localhost:3000/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary"
 
+curl -N "http://localhost:3000/api/match-prep/stream?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary"
+
 curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
 
 curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=full"
@@ -323,6 +339,7 @@ curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-
 Notes:
 
 - use `start` plus `status` with `detail=summary` for the best live UX on slow TinyFish runs
+- the frontend now tries the live research stream first in `mode=live`, then falls back to `start` plus `status` if the stream cannot stay attached
 - use `detail=full` only when you need the richer lineup and absence pass
 - the direct `mode=live` route still works, but it waits for the live extraction unless a cached result already exists
 - active live runs and cached results are currently in-memory only, so restarting `npm run dev` clears them

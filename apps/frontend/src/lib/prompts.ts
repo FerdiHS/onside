@@ -1,5 +1,5 @@
 import type { MatchPrepScenario } from "@/lib/mock-data";
-import type { MatchPrepDetail } from "@/lib/schemas";
+import type { MatchPrepData, MatchPrepDetail } from "@/lib/schemas";
 
 export function buildMatchPrepGoal(
   scenario: MatchPrepScenario,
@@ -113,5 +113,33 @@ export function buildMatchPrepGoal(
     "Stop when ANY of these is true:",
     ...stopConditions,
     ...live_notes.map((note) => `- ${note}`),
+  ].join("\n");
+}
+
+export function buildMatchPrepSummaryEnrichmentPrompt(
+  data: MatchPrepData,
+): string {
+  return [
+    "You are enriching a club-facing football match summary.",
+    "You are not scraping the web. Use only the structured match data and source links provided below.",
+    "",
+    "Your job:",
+    "- Fill summary-mode gaps when the live extractor returned incomplete fields.",
+    "- Prioritize a plausible projected XI for any side with fewer than 11 players.",
+    "- Supplement recent_context or key_talking_points only when they are empty.",
+    "- Only supplement injuries_or_absences when there are already availability signals in the structured input.",
+    "",
+    "Hard rules:",
+    "- Do not rewrite or contradict source-backed root fields.",
+    "- Do not invent absences from nothing.",
+    "- If you are unsure, return an empty items array for that field.",
+    "- When projecting lineups, keep any source-backed names that already exist unless they are obviously incompatible with the rest of the XI.",
+    "- Notes must be brief and transparent that the field is an AI-assisted projection.",
+    "",
+    "Return structured JSON that only contains candidate display values for missing or incomplete fields.",
+    "For fields that do not need enrichment, return an empty items array and null note/confidence.",
+    "",
+    "Structured match data:",
+    JSON.stringify(data, null, 2),
   ].join("\n");
 }

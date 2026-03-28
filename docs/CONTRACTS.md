@@ -255,6 +255,48 @@ type MatchPrepResponse = {
     recent_context: string[];
     key_talking_points: string[];
     sources: SourceLink[];
+    display?: {
+      probable_lineups: {
+        home: {
+          items: string[];
+          provenance: "source-backed" | "ai-assisted" | "mixed";
+          note?: string;
+          confidence?: "low" | "medium" | "high";
+        };
+        away: {
+          items: string[];
+          provenance: "source-backed" | "ai-assisted" | "mixed";
+          note?: string;
+          confidence?: "low" | "medium" | "high";
+        };
+      };
+      injuries_or_absences: {
+        home: {
+          items: string[];
+          provenance: "source-backed" | "ai-assisted" | "mixed";
+          note?: string;
+          confidence?: "low" | "medium" | "high";
+        };
+        away: {
+          items: string[];
+          provenance: "source-backed" | "ai-assisted" | "mixed";
+          note?: string;
+          confidence?: "low" | "medium" | "high";
+        };
+      };
+      recent_context: {
+        items: string[];
+        provenance: "source-backed" | "ai-assisted" | "mixed";
+        note?: string;
+        confidence?: "low" | "medium" | "high";
+      };
+      key_talking_points: {
+        items: string[];
+        provenance: "source-backed" | "ai-assisted" | "mixed";
+        note?: string;
+        confidence?: "low" | "medium" | "high";
+      };
+    };
   };
   meta: ResponseMeta;
 };
@@ -266,6 +308,8 @@ type MatchPrepResponse = {
 - `injuries_or_absences` may be empty even when the response is valid.
 - `recent_context` and `key_talking_points` should be concise and factual.
 - No invented facts.
+- Root Match Prep fields stay as the normalized TinyFish payload.
+- `data.display` is optional and may contain AI-assisted fallback presentation fields for summary-mode live responses.
 
 ---
 
@@ -444,6 +488,7 @@ Returns `FailureResponse`.
 ### Current implementation notes
 
 - The current implementation is mock-backed from the seeded Match Prep scenario list.
+- Only fixtures with kickoff times at or after the current server time are returned.
 - Optional `clubId` filters by either home or away club slug.
 - Optional `competition` filters by exact competition label.
 
@@ -483,6 +528,7 @@ Returns `FailureResponse`.
 - If live extraction partially fails, the route may still return `success: true` with `meta.completeness = "partial"`.
 - In the current implementation, this route also returns a cached completed live result when one exists for the requested `matchId`.
 - `detail=summary` keeps the same `MatchPrepResponse` shape but asks TinyFish for a lighter, faster summary-oriented live pass.
+- When `OPENAI_API_KEY` is configured, live `detail=summary` responses may include `data.display` with AI-assisted projected lineups or summary bullets while leaving the root TinyFish fields unchanged.
 - `detail=full` requests the richer Match Prep extraction and is the default when `detail` is omitted.
 
 ---
@@ -513,7 +559,8 @@ Start a long-running live Match Prep TinyFish run and return a pollable handle q
     "status": "pending",
     "cached": false,
     "poll_url": "/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary",
-    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
+    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary",
+    "next_poll_after_ms": 1500
   },
   "meta": {
     "mode": "live",
@@ -528,7 +575,9 @@ Start a long-running live Match Prep TinyFish run and return a pollable handle q
 ### Notes
 
 - If a completed cached result already exists, the route may return `status: "completed"` with `cached: true`.
+- Cached responses that were produced by the direct sync Match Prep route may omit `run_id`, because no async TinyFish run handle exists for them.
 - If an active run already exists for the same `matchId`, the route may return that existing `run_id` instead of starting a duplicate run.
+- Pending responses include `next_poll_after_ms` and a `Retry-After` header to guide frontend polling cadence.
 - `detail` is optional and defaults to `full` in the current route implementation.
 - Failures return `FailureResponse`.
 
@@ -601,9 +650,120 @@ Optional:
 ### Notes
 
 - In the current implementation, active run tracking and completed-result caching are in-memory only.
+- Cached responses that were produced by the direct sync Match Prep route may omit `run_id`, because no async TinyFish run handle exists for them.
+- Pending responses include `next_poll_after_ms` and a `Retry-After` header to guide frontend polling cadence.
 - If the dev server restarts, a previously returned `runId` may no longer be known to the app instance unless `matchId` is also provided.
 - Failures inside a completed or cancelled TinyFish run are returned inside the success payload's `data.error` field so the UI can keep polling and rendering one stable shape.
 - Route-level validation or config failures still return `FailureResponse`.
+
+---
+
+## `GET /api/match-prep/stream?matchId=<id>`
+
+### Purpose
+
+Open a server-owned SSE stream for live Match Prep research in `detail=summary`, including curated progress updates and an optional TinyFish browser preview URL.
+
+### Required query params
+
+- `matchId`
+
+### Optional query params
+
+- `detail=summary`
+
+### Notes
+
+- Streaming is currently supported only for `detail=summary`.
+- The frontend should prefer this stream for live Match Prep UX, then fall back to `POST /api/match-prep/start` and `GET /api/match-prep/status` if the stream errors or disconnects.
+- The route calls TinyFish server-side and must never expose `TINYFISH_API_KEY`.
+- On completion, the route caches the same normalized and enriched `MatchPrepData` used by the polling flow.
+
+### SSE events
+
+#### `event: started`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "timestamp": "2026-03-28T12:34:56Z"
+}
+```
+
+#### `event: preview`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "streaming_url": "https://...",
+  "timestamp": "2026-03-28T12:34:58Z"
+}
+```
+
+#### `event: progress`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "label": "Opening trusted source",
+  "raw_purpose": "Open OneFootball preview page",
+  "timestamp": "2026-03-28T12:35:02Z"
+}
+```
+
+#### `event: heartbeat`
+
+```json
+{
+  "timestamp": "2026-03-28T12:35:05Z"
+}
+```
+
+#### `event: complete`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "result": {
+    "match_id": "friendly-usa-vs-belgium-2026-03-28",
+    "competition": "International Friendly",
+    "kickoff_time": "2026-03-28T19:30:00Z",
+    "home_team": "USA",
+    "away_team": "Belgium",
+    "probable_lineups": { "home": [], "away": [] },
+    "injuries_or_absences": { "home": [], "away": [] },
+    "recent_context": [],
+    "key_talking_points": [],
+    "sources": []
+  },
+  "completeness": "partial",
+  "timestamp": "2026-03-28T12:35:20Z"
+}
+```
+
+#### `event: error`
+
+```json
+{
+  "match_id": "friendly-usa-vs-belgium-2026-03-28",
+  "run_id": "tf_run_123",
+  "code": "UPSTREAM_FAILURE",
+  "message": "TinyFish streaming failed before completion.",
+  "timestamp": "2026-03-28T12:35:21Z"
+}
+```
+
+### Event semantics
+
+- `started` confirms the TinyFish run was created.
+- `preview` shares a TinyFish browser preview URL when available.
+- `progress` is app-curated text and should be treated as user-facing status, not a full raw TinyFish trace.
+- `complete` returns the final `MatchPrepData` payload and should be treated as terminal.
+- `error` is terminal for the stream; the frontend should gracefully fall back to polling.
 
 ---
 

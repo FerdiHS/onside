@@ -7,7 +7,9 @@ import {
   registerActiveMatchPrepRun,
 } from "@/lib/match-prep-jobs";
 import {
+  getMatchPrepPollIntervalMs,
   mapMatchPrepRuntimeError,
+  retryAfterSeconds,
   resolveMatchPrepDetail,
 } from "@/lib/match-prep-runtime";
 import {
@@ -16,6 +18,7 @@ import {
   failureStatusCode,
   isMatchPrepDetail,
   type MatchPrepDetail,
+  type MatchPrepRunResponse,
 } from "@/lib/schemas";
 import { startLiveMatchPrepRun } from "@/lib/tinyfish";
 
@@ -49,11 +52,11 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         match_id: matchId,
-        run_id: cached.runId,
         status: "completed",
         cached: true,
         poll_url: buildStatusUrl(matchId, detail),
         result_url: buildResultUrl(matchId, detail),
+        ...(cached.runId ? { run_id: cached.runId } : {}),
       },
       meta: createMeta("live", cached.completeness, {
         progress_supported: true,
@@ -64,7 +67,8 @@ export async function POST(request: NextRequest) {
 
   const active = getActiveMatchPrepRunByMatchId(matchId, detail);
   if (active) {
-    return Response.json({
+    const nextPollAfterMs = getMatchPrepPollIntervalMs(active.status);
+    const response: MatchPrepRunResponse = {
       success: true,
       data: {
         match_id: matchId,
@@ -74,13 +78,21 @@ export async function POST(request: NextRequest) {
         poll_url: buildStatusUrl(matchId, detail),
         result_url: buildResultUrl(matchId, detail),
         streaming_url: active.streamingUrl,
+        next_poll_after_ms: nextPollAfterMs,
       },
       meta: createMeta("live", "partial", { progress_supported: true, detail }),
+    };
+
+    return Response.json(response, {
+      headers: {
+        "Retry-After": retryAfterSeconds(nextPollAfterMs),
+      },
     });
   }
 
   try {
     const started = await startLiveMatchPrepRun(scenario, detail);
+    const nextPollAfterMs = getMatchPrepPollIntervalMs("pending");
     registerActiveMatchPrepRun({
       matchId,
       detail,
@@ -88,7 +100,7 @@ export async function POST(request: NextRequest) {
       status: "pending",
     });
 
-    return Response.json({
+    const response: MatchPrepRunResponse = {
       success: true,
       data: {
         match_id: matchId,
@@ -97,8 +109,15 @@ export async function POST(request: NextRequest) {
         cached: false,
         poll_url: buildStatusUrl(matchId, detail),
         result_url: buildResultUrl(matchId, detail),
+        next_poll_after_ms: nextPollAfterMs,
       },
       meta: createMeta("live", "partial", { progress_supported: true, detail }),
+    };
+
+    return Response.json(response, {
+      headers: {
+        "Retry-After": retryAfterSeconds(nextPollAfterMs),
+      },
     });
   } catch (error) {
     const failure = mapMatchPrepRuntimeError(error, detail);
