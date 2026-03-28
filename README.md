@@ -258,6 +258,20 @@ npm run typecheck
 npm run build
 ```
 
+## Commit Convention (Release Please)
+
+This repository uses Conventional Commits so Release Please can generate changelogs and release PRs consistently.
+
+Recommended prefixes:
+- `feat:` for user-facing features (minor release)
+- `fix:` for bug fixes (patch release)
+- `docs:` for documentation-only changes
+- `chore:` for maintenance and tooling updates
+
+Release automation uses a GitHub App token. Configure these repository secrets:
+- `RELEASE_PLEASE_APP_ID`
+- `RELEASE_PLEASE_APP_PRIVATE_KEY`
+
 ---
 
 ## Current Implementation Plan
