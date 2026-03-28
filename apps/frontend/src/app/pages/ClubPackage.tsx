@@ -4,9 +4,34 @@ import { useState } from 'react';
 import { TrendingUp, Minus, AlertTriangle } from 'lucide-react';
 import { ClubBadge } from '../components/ClubBadge';
 
+type PlayerStatus = 'rising' | 'stable' | 'concern' | 'critical';
+
+type ClubSource = {
+  title: string;
+  domain: string;
+};
+
+type ClubPlayer = {
+  name: string;
+  currentClub: string;
+  status: PlayerStatus;
+  summary: string;
+  lastUpdate: string;
+  isLoan?: boolean;
+};
+
+type ClubInfo = {
+  trackedPlayers: number;
+  rising: number;
+  stable: number;
+  concern: number;
+  players: ClubPlayer[];
+  sources: ClubSource[];
+};
+
 const clubs = ['Chelsea', 'Manchester United', 'Arsenal', 'Liverpool'];
 
-const clubData: Record<string, any> = {
+const clubData: Record<string, ClubInfo> = {
   'Chelsea': {
     trackedPlayers: 18,
     rising: 6,
@@ -185,7 +210,7 @@ export function ClubPackage() {
               </span>
             </div>
 
-            {current.players.map((player: any, i: number) => {
+            {current.players.map((player: ClubPlayer, i: number) => {
               const st = statusStyle(player.status);
               const isLoan = player.isLoan;
               return (
@@ -254,7 +279,7 @@ export function ClubPackage() {
             <div style={card}>
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#e8edf5', marginBottom: '14px' }}>Sources</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {current.sources.map((source: any, i: number) => (
+                {current.sources.map((source: ClubSource, i: number) => (
                   <div key={i} style={{
                     padding: '10px 14px',
                     borderRadius: '8px',

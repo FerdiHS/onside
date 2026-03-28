@@ -3,6 +3,29 @@
 import { useState } from 'react';
 import { ClubBadge } from '../components/ClubBadge';
 
+type PlayerUpdate = {
+  date: string;
+  text: string;
+  type: string;
+};
+
+type PlayerSource = {
+  title: string;
+  domain: string;
+};
+
+type PlayerStatus = 'rising' | 'stable' | 'concern' | 'critical';
+
+type PlayerInfo = {
+  club: string;
+  position: string;
+  status: PlayerStatus;
+  summary: string;
+  availability: string;
+  recentUpdates: PlayerUpdate[];
+  sources: PlayerSource[];
+};
+
 const clubs = ['Chelsea', 'Manchester United', 'Arsenal', 'Liverpool'];
 
 const playersByClub: Record<string, string[]> = {
@@ -12,7 +35,7 @@ const playersByClub: Record<string, string[]> = {
   'Liverpool': ['Mohamed Salah', 'Darwin Núñez', 'Alexis Mac Allister'],
 };
 
-const playerData: Record<string, any> = {
+const playerData: Record<string, PlayerInfo> = {
   'Cole Palmer': {
     club: 'Chelsea',
     position: 'Attacking Midfielder',
@@ -288,7 +311,7 @@ export function PlayerWatch() {
             <div style={card}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#e8edf5', marginBottom: '16px' }}>Recent Updates</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {currentPlayer.recentUpdates.map((update: any, i: number) => (
+                {currentPlayer.recentUpdates.map((update: PlayerUpdate, i: number) => (
                   <div key={i} style={{
                     padding: '14px 16px',
                     borderRadius: '8px',
@@ -322,7 +345,7 @@ export function PlayerWatch() {
             <div style={card}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#e8edf5', marginBottom: '14px' }}>Sources</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {currentPlayer.sources.map((source: any, i: number) => (
+                {currentPlayer.sources.map((source: PlayerSource, i: number) => (
                   <div key={i} style={{
                     padding: '10px 14px',
                     borderRadius: '8px',

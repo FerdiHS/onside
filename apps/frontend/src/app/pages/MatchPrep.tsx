@@ -1,6 +1,5 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { ClubBadge } from '../components/ClubBadge';
 
