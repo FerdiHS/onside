@@ -477,7 +477,8 @@ Start a long-running live Match Prep TinyFish run and return a pollable handle q
     "status": "pending",
     "cached": false,
     "poll_url": "/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary",
-    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
+    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary",
+    "next_poll_after_ms": 1500
   },
   "meta": {
     "mode": "live",
@@ -493,6 +494,7 @@ Start a long-running live Match Prep TinyFish run and return a pollable handle q
 - If a completed cached result already exists, the route may return `status: "completed"` with `cached: true`.
 - Cached responses that were produced by the direct sync Match Prep route may omit `run_id`, because no async TinyFish run handle exists for them.
 - If an active run already exists for the same `matchId`, the route may return that existing `run_id` instead of starting a duplicate run.
+- Pending responses include `next_poll_after_ms` and a `Retry-After` header to guide frontend polling cadence.
 - `detail` is optional and defaults to `full` in the current route implementation.
 - Failures return `FailureResponse`.
 
@@ -559,6 +561,7 @@ Optional:
 ### Notes
 - In the current implementation, active run tracking and completed-result caching are in-memory only.
 - Cached responses that were produced by the direct sync Match Prep route may omit `run_id`, because no async TinyFish run handle exists for them.
+- Pending responses include `next_poll_after_ms` and a `Retry-After` header to guide frontend polling cadence.
 - If the dev server restarts, a previously returned `runId` may no longer be known to the app instance unless `matchId` is also provided.
 - Failures inside a completed or cancelled TinyFish run are returned inside the success payload's `data.error` field so the UI can keep polling and rendering one stable shape.
 - Route-level validation or config failures still return `FailureResponse`.

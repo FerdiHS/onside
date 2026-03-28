@@ -162,6 +162,7 @@ The current Match Prep foundation supports:
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
+- pending polling responses include `next_poll_after_ms` and a `Retry-After` header so the frontend can poll predictably
 
 The current live Match Prep source strategy uses a curated football source pack:
 - Sofascore as the primary source

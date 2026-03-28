@@ -74,6 +74,38 @@ export type MatchPrepResponse = {
   meta: ResponseMeta;
 };
 
+export type MatchPrepPollStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type MatchPrepRunError = {
+  code: FailureCode;
+  message: string;
+  details?: Record<string, unknown>;
+};
+
+export type MatchPrepRunHandle = {
+  match_id: string;
+  status: MatchPrepPollStatus;
+  cached: boolean;
+  poll_url: string;
+  result_url: string;
+  run_id?: string;
+  streaming_url?: string | null;
+  next_poll_after_ms?: number;
+  result?: MatchPrepData;
+  error?: MatchPrepRunError;
+};
+
+export type MatchPrepRunResponse = {
+  success: true;
+  data: MatchPrepRunHandle;
+  meta: ResponseMeta;
+};
+
 export type MatchPrepSeedContext = Pick<
   MatchPrepData,
   "match_id" | "competition" | "kickoff_time" | "home_team" | "away_team"

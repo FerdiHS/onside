@@ -11,7 +11,9 @@ import {
   updateActiveMatchPrepRun,
 } from "@/lib/match-prep-jobs";
 import {
+  getMatchPrepPollIntervalMs,
   mapMatchPrepRuntimeError,
+  retryAfterSeconds,
   resolveMatchPrepDetail,
 } from "@/lib/match-prep-runtime";
 import {
@@ -20,6 +22,7 @@ import {
   failureStatusCode,
   isMatchPrepDetail,
   type MatchPrepDetail,
+  type MatchPrepRunResponse,
 } from "@/lib/schemas";
 import { getLiveMatchPrepRunStatus } from "@/lib/tinyfish";
 
@@ -163,7 +166,10 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      return Response.json({
+      const nextPollAfterMs = getMatchPrepPollIntervalMs(
+        toClientPendingStatus(polled.status),
+      );
+      const response: MatchPrepRunResponse = {
         success: true,
         data: {
           match_id: matchId,
@@ -173,8 +179,15 @@ export async function GET(request: NextRequest) {
           poll_url: buildStatusUrl(matchId, detail),
           result_url: buildResultUrl(matchId, detail),
           streaming_url: polled.streamingUrl,
+          next_poll_after_ms: nextPollAfterMs,
         },
         meta: createMeta("live", "partial", { progress_supported: true, detail }),
+      };
+
+      return Response.json(response, {
+        headers: {
+          "Retry-After": retryAfterSeconds(nextPollAfterMs),
+        },
       });
     }
 
@@ -187,7 +200,7 @@ export async function GET(request: NextRequest) {
         completeness: polled.completeness,
       });
 
-      return Response.json({
+      const response: MatchPrepRunResponse = {
         success: true,
         data: {
           match_id: matchId,
@@ -203,12 +216,14 @@ export async function GET(request: NextRequest) {
           progress_supported: true,
           detail,
         }),
-      });
+      };
+
+      return Response.json(response);
     }
 
     clearActiveMatchPrepRun(runId);
 
-    return Response.json({
+    const response: MatchPrepRunResponse = {
       success: true,
       data: {
         match_id: matchId,
@@ -225,7 +240,9 @@ export async function GET(request: NextRequest) {
         },
       },
       meta: createMeta("live", "partial", { progress_supported: true, detail }),
-    });
+    };
+
+    return Response.json(response);
   } catch (error) {
     const failure = mapMatchPrepRuntimeError(error, detail);
 
