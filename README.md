@@ -143,6 +143,7 @@ It is used to perform live web extraction and turn football web pages into struc
 
 ### Current Match Prep implementation
 The current Match Prep foundation supports:
+- `GET /api/fixtures` for the mock upcoming match selector
 - `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
 - `POST /api/match-prep/start` to start a live TinyFish run quickly
 - `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
@@ -276,6 +277,8 @@ npm run dev
 Try the current Match Prep endpoints:
 
 ```bash
+curl "http://localhost:3000/api/fixtures"
+
 curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=mock"
 
 curl -X POST "http://localhost:3000/api/match-prep/start" \

@@ -33,6 +33,22 @@ export type SourceLink = {
   domain?: string | null;
 };
 
+export type MatchSummary = {
+  id: string;
+  competition: string | null;
+  kickoff_time: string | null;
+  home_team: string;
+  away_team: string;
+  home_club_id?: string | null;
+  away_club_id?: string | null;
+};
+
+export type FixturesResponse = {
+  success: true;
+  data: MatchSummary[];
+  meta: ResponseMeta;
+};
+
 export type MatchPrepData = {
   match_id: string;
   competition: string | null;

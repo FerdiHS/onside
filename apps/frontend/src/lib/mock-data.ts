@@ -1,5 +1,6 @@
 import {
   createMeta,
+  type MatchSummary,
   type MatchPrepDetail,
   type MatchPrepData,
   type MatchPrepResponse,
@@ -392,6 +393,30 @@ export function getMatchPrepScenario(matchId: string): MatchPrepScenario | null 
   return MATCH_PREP_SCENARIOS[matchId] ?? null;
 }
 
+export function listMatchPrepScenarios(): Array<{
+  matchId: string;
+  scenario: MatchPrepScenario;
+}> {
+  return Object.entries(MATCH_PREP_SCENARIOS).map(([matchId, scenario]) => ({
+    matchId,
+    scenario,
+  }));
+}
+
+export function listMatchPrepFixtures(): MatchSummary[] {
+  return listMatchPrepScenarios()
+    .map(({ matchId, scenario }) => ({
+      id: matchId,
+      competition: scenario.mock.competition,
+      kickoff_time: scenario.mock.kickoff_time,
+      home_team: scenario.mock.home_team,
+      away_team: scenario.mock.away_team,
+      home_club_id: clubIdFromTeamName(scenario.mock.home_team),
+      away_club_id: clubIdFromTeamName(scenario.mock.away_team),
+    }))
+    .sort(compareMatchSummariesByKickoff);
+}
+
 export function createMockMatchPrepResponse(
   scenario: MatchPrepScenario,
   detail: MatchPrepDetail = "full",
@@ -401,4 +426,32 @@ export function createMockMatchPrepResponse(
     data: scenario.mock,
     meta: createMeta("mock", "full", { detail }),
   };
+}
+
+function clubIdFromTeamName(teamName: string): string {
+  return teamName
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/gu, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/gu, "-");
+}
+
+function compareMatchSummariesByKickoff(a: MatchSummary, b: MatchSummary): number {
+  const aTime = a.kickoff_time ? Date.parse(a.kickoff_time) : Number.POSITIVE_INFINITY;
+  const bTime = b.kickoff_time ? Date.parse(b.kickoff_time) : Number.POSITIVE_INFINITY;
+
+  if (Number.isNaN(aTime) && Number.isNaN(bTime)) {
+    return a.id.localeCompare(b.id);
+  }
+
+  if (Number.isNaN(aTime)) {
+    return 1;
+  }
+
+  if (Number.isNaN(bTime)) {
+    return -1;
+  }
+
+  return aTime - bTime;
 }

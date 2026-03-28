@@ -413,6 +413,11 @@ Returns `FixturesResponse`.
 ### Failure
 Returns `FailureResponse`.
 
+### Current implementation notes
+- The current implementation is mock-backed from the seeded Match Prep scenario list.
+- Optional `clubId` filters by either home or away club slug.
+- Optional `competition` filters by exact competition label.
+
 ---
 
 ## `GET /api/match-prep?matchId=<id>`
