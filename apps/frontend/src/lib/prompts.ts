@@ -1,0 +1,117 @@
+import type { MatchPrepScenario } from "@/lib/mock-data";
+import type { MatchPrepDetail } from "@/lib/schemas";
+
+export function buildMatchPrepGoal(
+  scenario: MatchPrepScenario,
+  detail: MatchPrepDetail = "full",
+): string {
+  const { mock, live_source_pack, live_notes } = scenario;
+  const allowedDomains = [
+    live_source_pack.primary,
+    ...live_source_pack.supporting,
+  ].map((source) => source.domain ?? new URL(source.url).hostname);
+  const isSummaryOnly = detail === "summary";
+  const stopConditions = isSummaryOnly
+    ? [
+        "- You have enough for a concise summary: recent_context, key_talking_points, and at least one trustworthy source.",
+        "- The primary source alone already gives enough reliable context for the summary view.",
+        "- The site is blocked, requires login, or cannot provide reliable data.",
+      ]
+    : [
+        "- The requested fields are complete or intentionally empty.",
+        "- The primary source plus one trustworthy supporting source have been checked.",
+        "- The site is blocked, requires login, or cannot provide reliable data.",
+      ];
+  const detailGuidance = isSummaryOnly
+    ? [
+        "This request is for the fast summary view.",
+        "Prioritize recent_context, key_talking_points, and sources.",
+        "Do not spend extra time chasing probable_lineups or injuries_or_absences.",
+        "If probable_lineups or injuries_or_absences are not obvious on the current page, return them as empty arrays immediately.",
+      ]
+    : [
+        "This request is for the full match-prep view.",
+        "Collect probable_lineups, injuries_or_absences, recent_context, key_talking_points, and sources when available.",
+      ];
+
+  return [
+    "You are gathering football match-prep intelligence for a club-facing dashboard.",
+    "",
+    "Match context:",
+    `- match_id: ${mock.match_id}`,
+    `- competition: ${mock.competition ?? "unknown"}`,
+    `- kickoff_time: ${mock.kickoff_time ?? "unknown"}`,
+    `- home_team: ${mock.home_team}`,
+    `- away_team: ${mock.away_team}`,
+    `- primary_url: ${live_source_pack.primary.url}`,
+    "",
+    "Exact fixture matching criteria:",
+    `- home team must be ${mock.home_team}`,
+    `- away team must be ${mock.away_team}`,
+    `- competition must be ${mock.competition ?? "the expected competition"}`,
+    `- kickoff must match or closely correspond to ${mock.kickoff_time ?? "the expected kickoff window"}`,
+    "- Skip pages that are about a different competition, a different fixture, or only a historical meeting unless they add clearly labeled supporting context.",
+    "",
+    "Curated football source pack:",
+    `- primary source: ${live_source_pack.primary.title} (${live_source_pack.primary.url})`,
+    ...live_source_pack.supporting.map(
+      (source) => `- supporting source: ${source.title} (${source.url})`,
+    ),
+    "",
+    `Allowed domains: ${allowedDomains.join(", ")}`,
+    "",
+    "Start at the primary source URL. Use the supporting URLs only if needed to complete missing fields for this exact fixture.",
+    "Stay on the curated source pack domains. Do not browse the wider web unless none of the curated sources contain the required data.",
+    ...detailGuidance.map((line) => line),
+    "",
+    "Return JSON only with exactly one of these shapes:",
+    "{",
+    '  "success": true,',
+    '  "data": {',
+    `    "match_id": "${mock.match_id}",`,
+    '    "competition": "string or null",',
+    '    "kickoff_time": "ISO 8601 string or null",',
+    `    "home_team": "${mock.home_team}",`,
+    `    "away_team": "${mock.away_team}",`,
+    '    "probable_lineups": { "home": ["string"], "away": ["string"] },',
+    '    "injuries_or_absences": { "home": ["string"], "away": ["string"] },',
+    '    "recent_context": ["string"],',
+    '    "key_talking_points": ["string"],',
+    '    "sources": [{ "title": "string", "url": "string", "domain": "string or null" }]',
+    "  }",
+    "}",
+    "",
+    "Or, if you cannot complete it safely:",
+    "{",
+    '  "success": false,',
+    '  "error_type": "timeout" | "blocked" | "not_found" | "insufficient_sources",',
+    '  "error_message": "string",',
+    '  "partial_data": {',
+    `    "match_id": "${mock.match_id}",`,
+    '    "competition": "string or null",',
+    '    "kickoff_time": "ISO 8601 string or null",',
+    `    "home_team": "${mock.home_team}",`,
+    `    "away_team": "${mock.away_team}",`,
+    '    "probable_lineups": { "home": ["string"], "away": ["string"] },',
+    '    "injuries_or_absences": { "home": ["string"], "away": ["string"] },',
+    '    "recent_context": ["string"],',
+    '    "key_talking_points": ["string"],',
+    '    "sources": [{ "title": "string", "url": "string", "domain": "string or null" }]',
+    "  }",
+    "}",
+    "",
+    "Rules:",
+    "- Use source-backed facts only. Do not speculate.",
+    "- If a list field cannot be confirmed, return an empty array.",
+    "- Keep recent_context and key_talking_points concise and factual.",
+    "- Include source links for any claims you rely on.",
+    "- Use the fixture matching criteria above to discard unrelated pages quickly.",
+    "- Prefer Sofascore for fixture identity and lineups, then OneFootball or GOAL for preview context and availability notes.",
+    "- Use B/R Football and 433 only as supporting context, not as the sole basis for injuries, absences, or probable lineups.",
+    "- Ignore unrelated fixtures involving the same clubs.",
+    "",
+    "Stop when ANY of these is true:",
+    ...stopConditions,
+    ...live_notes.map((note) => `- ${note}`),
+  ].join("\n");
+}
