@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/FerdiHS/onside/compare/v0.3.0...v0.4.0) (2026-03-28)
+
+
+### Features
+
+* Frontend implementation  ([#41](https://github.com/FerdiHS/onside/issues/41)) ([2177a3d](https://github.com/FerdiHS/onside/commit/2177a3d0a472669b4669a14bab26cccfe162c601))
+
 ## [0.3.0](https://github.com/FerdiHS/onside/compare/v0.2.0...v0.3.0) (2026-03-28)
 
 
