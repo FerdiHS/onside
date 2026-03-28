@@ -156,6 +156,29 @@ It is used to perform live web extraction and turn football web pages into struc
 - failures should return structured error responses
 - partial data should be handled gracefully
 
+### Current Match Prep implementation
+
+The current Match Prep foundation supports:
+
+- `GET /api/fixtures` for the mock upcoming match selector
+- `GET /api/match-prep?matchId=<id>&mode=mock|live&detail=summary|full`
+- `POST /api/match-prep/start` to start a live TinyFish run quickly
+- `GET /api/match-prep/status?matchId=<id>&detail=summary|full` to poll a live TinyFish run
+
+The current live Match Prep source strategy uses a curated football source pack:
+
+- Sofascore as the primary source
+- OneFootball, GOAL, B/R Football, and 433 as supporting sources
+
+Completed Match Prep results are cached in memory per dev-server instance for faster follow-up reads.
+
+The `detail` level is important for UX:
+
+- `detail=summary` asks TinyFish for a lighter, faster summary-focused payload
+- `detail=full` asks TinyFish for the richer Match Prep payload, including lineups and absences when available
+
+Both detail levels keep the same JSON shape. In summary mode, lineup and absence fields may intentionally be empty arrays.
+
 ---
 
 ---
@@ -248,6 +271,8 @@ Example:
 TINYFISH_API_KEY=
 OPENAI_API_KEY=
 LIVE_TINYFISH=false
+TINYFISH_TIMEOUT_MS=300000
+TINYFISH_BROWSER_PROFILE=lite
 NEXT_PUBLIC_APP_NAME=Onside
 ```
 
@@ -255,6 +280,9 @@ Notes:
 
 - `TINYFISH_API_KEY` is required for live TinyFish mode
 - `OPENAI_API_KEY` is required for server-side synthesis features
+- `TINYFISH_TIMEOUT_MS` controls how long the server waits for TinyFish sync calls before timing out
+- `TINYFISH_BROWSER_PROFILE` can be `lite` or `stealth`
+- `TINYFISH_PROXY_COUNTRY` is optional if geographic proxy routing is needed
 - keep secrets server-side only
 - do not commit `.env.local`
 
@@ -273,6 +301,31 @@ Start the development server:
 ```bash
 npm run dev
 ```
+
+Try the current Match Prep endpoints:
+
+```bash
+curl "http://localhost:3000/api/fixtures"
+
+curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=mock"
+
+curl -X POST "http://localhost:3000/api/match-prep/start" \
+  -H "Content-Type: application/json" \
+  -d '{"matchId":"friendly-usa-vs-belgium-2026-03-28","detail":"summary"}'
+
+curl "http://localhost:3000/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary"
+
+curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
+
+curl "http://localhost:3000/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=full"
+```
+
+Notes:
+
+- use `start` plus `status` with `detail=summary` for the best live UX on slow TinyFish runs
+- use `detail=full` only when you need the richer lineup and absence pass
+- the direct `mode=live` route still works, but it waits for the live extraction unless a cached result already exists
+- active live runs and cached results are currently in-memory only, so restarting `npm run dev` clears them
 
 Run checks if configured:
 

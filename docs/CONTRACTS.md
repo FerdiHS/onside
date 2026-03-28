@@ -7,6 +7,7 @@ This document defines the **data contracts** and **route-level contracts** for O
 The goal is to keep the MVP predictable, validateable, and easy to evolve during the hackathon.
 
 This is **not** a public enterprise API specification. It is the source of truth for:
+
 - frontend to backend contracts
 - mock mode and live mode response shapes
 - shared domain models
@@ -44,6 +45,7 @@ This is **not** a public enterprise API specification. It is the source of truth
 ## Shared Conventions
 
 ### Content type
+
 All JSON routes return:
 
 ```http
@@ -51,36 +53,43 @@ Content-Type: application/json
 ```
 
 ### Timestamps
+
 Use ISO 8601 UTC timestamps where applicable.
 
 Example:
+
 ```json
 "generated_at": "2026-03-28T12:34:56Z"
 ```
 
 ### IDs
+
 IDs are string-based for the hackathon MVP.
 
 Examples:
+
 - `clubId`: `"chelsea"`
 - `playerId`: `"jimmy-jay-morgan"`
-- `matchId`: `"ucl-arsenal-vs-barcelona-2026-04-01"`
+- `matchId`: `"friendly-usa-vs-belgium-2026-03-28"`
 
 No UUID requirement for the MVP.
 
 ### Enums
 
 #### Status
+
 ```ts
 type WatchStatus = "rising" | "stable" | "concern";
 ```
 
 #### Mode
+
 ```ts
 type DataMode = "mock" | "live";
 ```
 
 #### Result completeness
+
 ```ts
 type Completeness = "full" | "partial";
 ```
@@ -96,11 +105,13 @@ type ResponseMeta = {
   mode: "mock" | "live";
   completeness: "full" | "partial";
   generated_at: string;
+  detail?: "summary" | "full";
   progress_supported?: boolean;
 };
 ```
 
 This metadata helps:
+
 - explain the current execution mode
 - communicate fallback behavior
 - support debugging during demo
@@ -117,7 +128,12 @@ All route-level failures should normalize to this shape:
 type FailureResponse = {
   success: false;
   error: {
-    code: "BAD_REQUEST" | "NOT_FOUND" | "UPSTREAM_FAILURE" | "VALIDATION_ERROR" | "INTERNAL_ERROR";
+    code:
+      | "BAD_REQUEST"
+      | "NOT_FOUND"
+      | "UPSTREAM_FAILURE"
+      | "VALIDATION_ERROR"
+      | "INTERNAL_ERROR";
     message: string;
     details?: Record<string, unknown>;
   };
@@ -126,6 +142,7 @@ type FailureResponse = {
 ```
 
 ### Notes
+
 - `UPSTREAM_FAILURE` is used when TinyFish or another live extraction step fails.
 - `VALIDATION_ERROR` is used when structured output cannot be safely parsed.
 - `NOT_FOUND` is used when the requested club, match, or player does not exist in supported demo scope.
@@ -196,19 +213,19 @@ type PlayerSummary = {
 
 ---
 
-
-
 ## Synthesis Contract
 
 OpenAI-powered synthesis is optional but supported.
 
 ### Rules
+
 - OpenAI synthesis happens server-side only.
 - It should enrich existing structured outputs, not replace them.
 - If synthesis fails, the route may still return `success: true` as long as the structured fields are valid.
 - Synthesized text should remain concise and grounded in the structured inputs.
 
 ### Typical uses
+
 - Match Prep concise briefing summary
 - Match Prep polished talking points
 - Player Watch short summary
@@ -244,6 +261,7 @@ type MatchPrepResponse = {
 ```
 
 ### Rules
+
 - `probable_lineups.home` and `probable_lineups.away` may be empty arrays.
 - `injuries_or_absences` may be empty even when the response is valid.
 - `recent_context` and `key_talking_points` should be concise and factual.
@@ -274,6 +292,7 @@ type PlayerWatchResponse = {
 ```
 
 ### Rules
+
 - `club_id` refers to the parent club context in the app.
 - `recent_updates`, `availability_notes`, and `recent_mentions` may be empty.
 - `summary` should still exist even in partial mode, but it may be brief.
@@ -307,6 +326,7 @@ type LoanMonitorResponse = {
 ```
 
 ### Rules
+
 - This is a club-facing extension of Player Watch.
 - The page may initially support only a few tracked players per demo club.
 - `players` may be empty only if the selected club is supported but no player dataset exists yet.
@@ -338,6 +358,7 @@ type FixturesResponse = {
 ```
 
 ### Notes
+
 - For the MVP, fixtures may come from mock data.
 - Live fixture sourcing can be added later without changing the response shape.
 
@@ -367,12 +388,15 @@ The exact HTTP methods can remain simple for the MVP.
 ## `GET /api/clubs`
 
 ### Purpose
+
 Return supported demo clubs.
 
 ### Query params
+
 None.
 
 ### Success
+
 ```json
 {
   "success": true,
@@ -399,60 +423,206 @@ None.
 ## `GET /api/fixtures`
 
 ### Purpose
+
 Return available fixtures for Match Prep selection.
 
 ### Query params
+
 Optional:
+
 - `clubId`
 - `competition`
 
 ### Success
+
 Returns `FixturesResponse`.
 
 ### Failure
+
 Returns `FailureResponse`.
+
+### Current implementation notes
+
+- The current implementation is mock-backed from the seeded Match Prep scenario list.
+- Optional `clubId` filters by either home or away club slug.
+- Optional `competition` filters by exact competition label.
 
 ---
 
 ## `GET /api/match-prep?matchId=<id>`
 
 ### Purpose
+
 Return structured match prep data.
 
 ### Notes
+
 - The route may internally use OpenAI server-side synthesis to polish talking points or summaries.
 - Even when synthesis is used, the returned shape must remain `MatchPrepResponse`.
 
 ### Required query params
+
 - `matchId`
 
 ### Optional query params
+
 - `mode=mock|live`
+- `detail=summary|full`
 
 ### Success
+
 Returns `MatchPrepResponse`.
 
 ### Failure
+
 Returns `FailureResponse`.
 
 ### Notes
+
 - `mode` can be omitted if the app decides mode using environment config.
 - If live extraction partially fails, the route may still return `success: true` with `meta.completeness = "partial"`.
+- In the current implementation, this route also returns a cached completed live result when one exists for the requested `matchId`.
+- `detail=summary` keeps the same `MatchPrepResponse` shape but asks TinyFish for a lighter, faster summary-oriented live pass.
+- `detail=full` requests the richer Match Prep extraction and is the default when `detail` is omitted.
+
+---
+
+## `POST /api/match-prep/start`
+
+### Purpose
+
+Start a long-running live Match Prep TinyFish run and return a pollable handle quickly.
+
+### Request body
+
+```json
+{
+  "matchId": "friendly-usa-vs-belgium-2026-03-28",
+  "detail": "summary"
+}
+```
+
+### Success
+
+```json
+{
+  "success": true,
+  "data": {
+    "match_id": "friendly-usa-vs-belgium-2026-03-28",
+    "run_id": "tf_run_123",
+    "status": "pending",
+    "cached": false,
+    "poll_url": "/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary",
+    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary"
+  },
+  "meta": {
+    "mode": "live",
+    "completeness": "partial",
+    "generated_at": "2026-03-28T12:34:56Z",
+    "detail": "summary",
+    "progress_supported": true
+  }
+}
+```
+
+### Notes
+
+- If a completed cached result already exists, the route may return `status: "completed"` with `cached: true`.
+- If an active run already exists for the same `matchId`, the route may return that existing `run_id` instead of starting a duplicate run.
+- `detail` is optional and defaults to `full` in the current route implementation.
+- Failures return `FailureResponse`.
+
+---
+
+## `GET /api/match-prep/status?matchId=<id>`
+
+### Purpose
+
+Poll the current TinyFish run state for Match Prep and return the normalized result once it is ready.
+
+### Query params
+
+One of:
+
+- `matchId`
+- `runId`
+
+Recommended:
+
+- `matchId`
+
+Optional:
+
+- `detail=summary|full`
+
+### Success states
+
+- `status: "pending"`
+- `status: "running"`
+- `status: "completed"`
+- `status: "failed"`
+- `status: "cancelled"`
+
+### Completed example
+
+```json
+{
+  "success": true,
+  "data": {
+    "match_id": "friendly-usa-vs-belgium-2026-03-28",
+    "run_id": "tf_run_123",
+    "status": "completed",
+    "cached": false,
+    "poll_url": "/api/match-prep/status?matchId=friendly-usa-vs-belgium-2026-03-28&detail=summary",
+    "result_url": "/api/match-prep?matchId=friendly-usa-vs-belgium-2026-03-28&mode=live&detail=summary",
+    "result": {
+      "match_id": "friendly-usa-vs-belgium-2026-03-28",
+      "competition": "International Friendly",
+      "kickoff_time": "2026-03-28T19:30:00Z",
+      "home_team": "USA",
+      "away_team": "Belgium",
+      "probable_lineups": { "home": [], "away": [] },
+      "injuries_or_absences": { "home": [], "away": [] },
+      "recent_context": [],
+      "key_talking_points": [],
+      "sources": []
+    }
+  },
+  "meta": {
+    "mode": "live",
+    "completeness": "partial",
+    "generated_at": "2026-03-28T12:34:56Z",
+    "detail": "summary",
+    "progress_supported": true
+  }
+}
+```
+
+### Notes
+
+- In the current implementation, active run tracking and completed-result caching are in-memory only.
+- If the dev server restarts, a previously returned `runId` may no longer be known to the app instance unless `matchId` is also provided.
+- Failures inside a completed or cancelled TinyFish run are returned inside the success payload's `data.error` field so the UI can keep polling and rendering one stable shape.
+- Route-level validation or config failures still return `FailureResponse`.
 
 ---
 
 ## `GET /api/players?clubId=<id>`
 
 ### Purpose
+
 Return tracked players for a selected club.
 
 ### Required query params
+
 - `clubId`
 
 ### Success
+
 Returns `PlayersForClubResponse`.
 
 ### Failure
+
 Returns `FailureResponse`.
 
 ---
@@ -460,23 +630,29 @@ Returns `FailureResponse`.
 ## `GET /api/player-watch?clubId=<id>&playerId=<id>`
 
 ### Purpose
+
 Return structured player watch data for a selected club/player pair.
 
 ### Notes
+
 - The route may internally use OpenAI server-side synthesis to produce the short summary field.
 - Even when synthesis is used, the returned shape must remain `PlayerWatchResponse`.
 
 ### Required query params
+
 - `clubId`
 - `playerId`
 
 ### Optional query params
+
 - `mode=mock|live`
 
 ### Success
+
 Returns `PlayerWatchResponse`.
 
 ### Failure
+
 Returns `FailureResponse`.
 
 ---
@@ -484,18 +660,23 @@ Returns `FailureResponse`.
 ## `GET /api/loan-monitor?clubId=<id>`
 
 ### Purpose
+
 Return the club package / loan monitor view.
 
 ### Required query params
+
 - `clubId`
 
 ### Optional query params
+
 - `mode=mock|live`
 
 ### Success
+
 Returns `LoanMonitorResponse`.
 
 ### Failure
+
 Returns `FailureResponse`.
 
 ---
@@ -503,14 +684,17 @@ Returns `FailureResponse`.
 ## Mode Contract
 
 ## Mock mode
+
 - Uses local structured demo data.
 - Must obey the same response shape as live mode.
 - Must always remain available during development.
 
 ## Live mode
+
 - Uses TinyFish-backed server-side extraction.
 - Must still return the same response shape.
 - May set `meta.completeness = "partial"` when some fields are unavailable.
+- Long-running live extraction may use a start plus poll flow without changing the final structured Match Prep result contract.
 
 ---
 
@@ -519,6 +703,7 @@ Returns `FailureResponse`.
 All live responses should be normalized through shared runtime validation before reaching the UI.
 
 Expected validation flow:
+
 1. fetch or receive raw result
 2. parse JSON
 3. validate against schema
@@ -526,21 +711,22 @@ Expected validation flow:
 5. return route-level response
 
 If validation fails, return:
+
 - `FailureResponse`
 - `error.code = "VALIDATION_ERROR"`
 
 ---
-
-
 
 ## Optional Progress Streaming Contract
 
 This contract is only needed if the app implements live progress text during loading.
 
 ### Purpose
+
 Allow the UI to show what the live agent is currently doing during a long-running extraction.
 
 ### Suggested event shape
+
 ```ts
 type ProgressEvent = {
   type: "progress";
@@ -550,6 +736,7 @@ type ProgressEvent = {
 ```
 
 ### Rules
+
 - Progress events are optional.
 - The UI must still work if no progress events are available.
 - Progress text should be concise and safe to display.
@@ -558,6 +745,7 @@ type ProgressEvent = {
 ## Contract Stability Rules
 
 During the hackathon:
+
 - prefer additive changes
 - avoid breaking response shapes unnecessarily
 - keep mock and live mode aligned
@@ -568,6 +756,7 @@ During the hackathon:
 ## Future Extensions
 
 Possible future additions without breaking the current design:
+
 - source confidence / confidence score
 - richer fixture filters
 - own squad watch
